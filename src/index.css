@@ -1,0 +1,84 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&family=Rethink+Sans:ital,wght@0,500;0,600;0,700;0,800;1,700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-palette-black: #07050f;
+  --color-palette-inferno: #ae0d0a;
+  --color-palette-lava: #740907;
+  --color-palette-plum: #521451;
+  --color-palette-smoke: #f5f5f5;
+}
+
+:root {
+  --c-black: #07050f;
+  --c-inferno: #ae0d0a;
+  --c-lava: #740907;
+  --c-plum: #521451;
+  --c-smoke: #f5f5f5;
+
+  /* Apple Easing Curves */
+  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-snappy: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.ease-spring { transition-timing-function: var(--ease-spring); }
+.ease-snappy { transition-timing-function: var(--ease-snappy); }
+.ease-smooth { transition-timing-function: var(--ease-smooth); }
+.ease-bounce { transition-timing-function: var(--ease-bounce); }
+
+/* Spring Jump Activation Keyframes for unified bar */
+@keyframes barSpringJump {
+  0% {
+    transform: translateY(28px) scale(0.92);
+    opacity: 0;
+  }
+  55% {
+    transform: translateY(-6px) scale(1.02);
+    opacity: 1;
+  }
+  80% {
+    transform: translateY(2px) scale(0.995);
+  }
+  100% {
+    transform: translateY(0px) scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-bar-spring {
+  animation: barSpringJump 380ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+    user-select: none;
+    -webkit-user-drag: none;
+  }
+  body {
+    margin: 0;
+    padding: 0;
+    background-color: var(--c-black);
+    color: var(--c-smoke);
+    font-family: 'Rethink Sans', 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
+    overflow: hidden;
+  }
+}
+
+/* Custom Scrollbar styled for Lunacy Preset Deck */
+.custom-deck-scrollbar::-webkit-scrollbar {
+  width: 5px;
+}
+.custom-deck-scrollbar::-webkit-scrollbar-track {
+  background: rgba(116, 9, 7, 0.4);
+  border-radius: 2px;
+}
+.custom-deck-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--c-inferno);
+  border-radius: 2px;
+}
+.custom-deck-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #cf100d;
+}

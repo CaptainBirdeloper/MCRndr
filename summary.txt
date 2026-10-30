@@ -1,0 +1,187 @@
+10. Origin Pop-Out & Button Child Pointer Hit Rule:
+    - Interactive buttons triggering origin-based modal pop-outs MUST add 'pointer-events-none select-none' to inner icons and text spans, and extract bounds via e.currentTarget.getBoundingClientRect() so sub-element targeting never disrupts origin or event bubbling.
+    - Modals animating from button origins into view must force DOM reflow (void modalRef.current.offsetHeight) and wait on double requestAnimationFrame before toggling isAnimated = true, guaranteeing browser paint commit of initial translate/scale before CSS transition triggers.
+11. Lighting Engine, Floating Modifier & Export Isolation Rule:
+    - Lights are 3D raycastable objects (userData.isLight = true) treated identically to models: G (grab) and R (rotate) hook directly into light groups with axis constraints (X/Y/Z).
+    - FloatingLightModal tracks projected 3D coordinates (with frustum & behind-camera culling) and auto-unmounts immediately when activeLightId is null (empty canvas click, Escape, or model click).
+    - In offscreen 4K exports (exporter.ts), light glyphs must be hidden before render and restored cleanly post-render.
+================================================================================
+MC RENDER ARCHITECTURE & CODEBASE REFERENCE (HIGH-ROI CHEAT SHEET)
+10. Origin Pop-Out & Button Child Pointer Hit Rule:
+    - Interactive buttons triggering origin-based modal pop-outs MUST add 'pointer-events-none select-none' to inner icons and text spans, and extract bounds via e.currentTarget.getBoundingClientRect() so sub-element targeting never disrupts origin or event bubbling.
+    - Modals animating from button origins into view must force DOM reflow (void modalRef.current.offsetHeight) and wait on double requestAnimationFrame before toggling isAnimated = true, guaranteeing browser paint commit of initial translate/scale before CSS transition triggers.
+11. Lighting Engine, Floating Modifier & Export Isolation Rule:
+    - Lights are 3D raycastable objects (userData.isLight = true) treated identically to models: G (grab) and R (rotate) hook directly into light groups with axis constraints (X/Y/Z).
+    - FloatingLightModal tracks projected 3D coordinates (with frustum & behind-camera culling) and auto-unmounts immediately when activeLightId is null (empty canvas click, Escape, or model click).
+    - In offscreen 4K exports (exporter.ts), light glyphs must be hidden before render and restored cleanly post-render.
+================================================================================
+Generated: 2026-10-30 | Target: Zero-waste 1-to-2 turn LLM feature and fix execution
+
+--------------------------------------------------------------------------------
+0. BLIND TRUST & SPEED EXECUTION PROTOCOL
+--------------------------------------------------------------------------------
+- Blind Trust: summary.txt is absolute ground truth. No exploratory directory/file scans.
+- Single-Target: Target exact responsible file -> apply minimal surgical diff -> verify with 'npm run build'.
+- Fixed-Canvas: UI mirrors 960x540 Lunacy desktop design 1:1. Never add responsive breakpoint prefixes (sm:, md:).
+
+--------------------------------------------------------------------------------
+1. DIRECTORY STRUCTURE & ACTIVE FILE ROLES
+--------------------------------------------------------------------------------
+index.html                           -> Entry HTML, dark AMOLED canvas (#000000), Google Fonts (Rethink Sans + Plus Jakarta Sans).
+src\main.tsx                         -> React 19 root DOM mount into #root.
+src\App.tsx                          -> Shell (< 130 lines). Coordinates Viewport, LeftSidebar, CameraDropdown, ExportModal, SettingsModal.
+src\types.ts                         -> Core domain types (BodyPartName, ShaderPassMode, ArmType, LightType, LightingStyle, LightItem, CameraItem).
+src\index.css                        -> Tailwind v4 theme, font imports, :root variables, custom scrollbar tokens.
+src\presets\poses.ts                 -> Preset library: walking, running, pointing, showcasing.
+src\utils\settings.ts                -> User settings schema (uiZoom, perpetualFov, orbitSensitivity, showGrid, showCameraGlyphs) & storage.
+src\utils\motion.tsx                 -> Fluid animation engine: preset Apple curves (spring, snappy, bounce), <Animate />.
+
+[Components - Modular Folders]
+src\components\Viewport.tsx          -> Canvas container, drag-and-drop .png skin handler, single-mount useEffect with callback locks.
+src\components\sidebar\LeftSidebar.tsx   -> 214px docked drawer (#360403), mode strip, skin uploader, Export & Settings buttons.
+src\components\sidebar\TransformCard.tsx -> 3-axis unified input card for translation and rotation with history.
+src\components\sidebar\PosePresets.tsx   -> 2-column preset grid with AutoFitText and add preset trigger.
+src\components\sidebar\CameraCard.tsx    -> Camera card for WORLD tab: CAMERA banner, active camera selector, per-camera FOV slider.
+src\components\sidebar\LightingCard.tsx  -> Lighting card for WORLD tab: style pill (Realistic vs Minecrafty), light list, intensity.
+src\components\modals\ExportModal.tsx    -> Modal dialog for 1080p/2K/4K resolution, camera view selection, alpha toggle, single & batch export.
+src\components\modals\SettingsModal.tsx  -> Settings modal dialog with dynamic button-origin spring translation (UI zoom 50-300%).
+src\components\modals\FloatingLightModal.tsx -> Screen-tracked floating modifier modal for active light intensity & quick controls.
+src\components\camera\CameraDropdown.tsx -> Top-right docked pill/menu for camera switching and selection.
+src\components\common\AutoFitText.tsx    -> Auto-shrinking text container for compact preset buttons.
+
+[Engine - Modular Subsystems]
+src\engine\render\scene.ts           -> Three.js stage management (SceneStage), render loop, lightingManager integration, cleanup.
+src\engine\render\shaders.ts         -> Custom GLSL ShaderMaterials: WEMPassMaterial, NormalPassMaterial, ClownIDPassMaterial.
+src\engine\render\exporter.ts        -> Offscreen multi-res render pipeline (1080p, 2K, 4K), PNG download, batch zip export.
+src\engine\rig\rig.ts                -> Dual-layer Steve (4px) and Alex (3px) Minecraft rig hierarchy, anatomical pivot anchors, box UVs.
+src\engine\rig\skin.ts               -> 64x64/64x32 skin UV unwrap, NearestFilter texture, procedural default Steve, detectSkinModel.
+src\engine\camera\cameraManager.ts   -> Multi-camera lifecycle, FOV-invariant CameraHelper frustums, cubic ease-out lerp transitions.
+src\engine\transforms\controls.ts    -> Modular stage coordinator: raycast limb selection, TransformControls gizmo, hotkey routing.
+src\engine\transforms\modalTransform.ts -> Blender-style modal transforms: screen drag, socket pivot projection, X/Y/Z guidelines.
+src\engine\transforms\history.ts     -> Undo/Redo history engine (60-depth stack), granular limb & root axis commits, rollback listeners.
+src\engine\lighting\lightingManager.ts -> Multi-light lifecycle, light selection, intensity/color adjustments, raycast targets.
+src\engine\lighting\lightingStyles.ts  -> Realistic (EVE) vs Minecrafty shadow & shading pipeline.
+src\engine\lighting\lightGlyphs.ts     -> Raycastable 3D wireframe glyphs (Sun disk, Point bulb) with hit-detection volumes.
+vite.config.ts              -> Production bundle split via manualChunks ('three', 'vendor', 'index') to keep app chunk ~314 kB.
+design.md                   -> Authoritative Lunacy AST design specification and geometric measurements.
+
+--------------------------------------------------------------------------------
+2. DATA MODELS, ENGINE STATE & PASS CONTRACTS
+--------------------------------------------------------------------------------
+Domain Types (src\types.ts):
+  - BodyPartName = 'head' | 'torso' | 'rightArm' | 'leftArm' | 'rightLeg' | 'leftLeg'
+  - ArmType = 'steve' | 'alex' (Steve = 4px width, Alex = 3px width)
+  - ShaderPassMode = 'beauty' | 'wem' | 'normal' | 'clown'
+  - PosePreset = { id: string, name: string, rotations: Record<BodyPartName, [number, number, number]>, rootPosition?: [number, number, number] }
+
+Engine Stage Interface (src\engine\scene.ts -> SceneStage):
+  - stage.scene: THREE.Scene
+  - stage.camera: THREE.PerspectiveCamera (FOV 45, pos [0, 1.5, 4.2], target [0, 1.0, 0])
+  - stage.renderer: THREE.WebGLRenderer (antialias: true, alpha: true, shadowMap: PCFSoftShadowMap, toneMapping: ACESFilmic)
+  - stage.rig: MinecraftRig (dual-layer articulated skeleton)
+  - stage.controlsManager: RigControlsManager (modal transforms, selection, gizmos)
+  - stage.setShaderPass(mode: ShaderPassMode) -> void
+  - stage.loadSkinFile(file: File) -> Promise<ArmType> (loads texture, auto-detects Alex/Steve, swaps arm geometry)
+  - stage.destroy() -> void (disposes controls, materials, renderer.forceContextLoss())
+
+Compositing Render Passes (src\engine\shaders.ts):
+  - beauty: MeshStandardMaterial with diffuse skin texture, roughness 0.85, metalness 0.05, 3-point lighting + shadow map.
+  - wem: Pure white entities mask (vec4(1.0)) with alpha discard for outer jacket/hat/sleeves.
+  - normal: Camera-space surface normals mapped to RGB via (vNormal * 0.5 + 0.5).
+  - clown: Discrete flat RGB ID per limb (Head=#FF2222, Torso=#22FF22, RArm=#2222FF, LArm=#FFFF22, RLeg=#FF22FF, LLeg=#22FFFF).
+
+Auto-Detection (src\engine\skin.ts -> detectSkinModel):
+  - Reads alpha at texture coords (55, 20..28) (Right Arm inner seam). Alpha < 10 -> 'alex' (3px), else 'steve' (4px).
+
+--------------------------------------------------------------------------------
+3. UI LAYOUT & GEOMETRY ARCHITECTURE (LUNACY 1:1 FIXED CANVAS)
+--------------------------------------------------------------------------------
+Screen Root (src\App.tsx):
+  - relative w-screen h-screen bg-[#07050F] text-white font-['Rethink_Sans'] select-none overflow-hidden.
+  - Viewport: absolute inset-0 w-full h-full.
+
+Left Sidebar (src\components\LeftSidebar.tsx):
+  - Dock: absolute left-0 top-0 bottom-0 z-40 w-[214px] bg-[#360403] border-0 shadow-none overflow-hidden.
+  - Collapse: isCollapsed ? '-translate-x-full' : 'translate-x-0' (duration-350 ease-spring).
+  - Handle: absolute top-1/2 -translate-y-1/2 z-50 w-[11px] h-[20px] bg-[#AE0D0A] rounded-r-md (left: 0px or 214px).
+  - Mode Strip: w-full h-[26px] bg-[#730907] p-[3px] sliding pill indicator (duration-300 ease-spring).
+  - Bottom Bar: w-full px-2.5 py-3 flex items-center gap-2 overflow-hidden box-border.
+    - Import Skin Pill: flex-1 min-w-0 h-[24px] rounded-full bg-[#07050F], 12px icon, 10px bold font, px-2.5.
+    - Export Button: w-[68px] shrink-0 h-[24px] rounded-[12px] bg-[#730907] hover:bg-[#AE0D0A], 11px semibold font.
+
+Transform Card (src\components\sidebar\TransformCard.tsx):
+  - Outer: mx-2 mt-3.5 w-[calc(100%-16px)] min-h-[267px] bg-[#730907]/40 rounded-[9px] overflow-hidden flex flex-col.
+  - Header: w-full h-[19px] bg-[#730907] flex items-center justify-center text-[11px] font-bold text-[#AD0D0A].
+  - 3-Column Unified Input Box: w-full h-[42px] bg-[#360403] rounded-[15px] for TRANSLATE and ROTATE.
+  - Empty State: Muted icon + helper text when in POSE mode with no limb selected.
+
+Pose Presets (src\components\sidebar\PosePresets.tsx):
+  - 2-column grid inside TransformCard in POSE mode with limb selected: w-full preset buttons (#360403 rounded-[12px]).
+
+--------------------------------------------------------------------------------
+4. KEYBOARD SHORTCUTS & INTERACTION MAP
+--------------------------------------------------------------------------------
+  - 1 / 2 / 3: Toggle between BODY (root), POSE (limb), and WORLD (camera) sidebar tabs.
+  - Left-Click on limb: Selects limb via recursive raycast (child.userData.isBodyPart = true).
+  - G / R: Switch active transform gizmo to Translate (G) or Rotate (R) mode; strips planar square clutter.
+  - K (or Alt+R): Reset active limb transform back to initial rotation [0, 0, 0].
+  - X / Y / Z: Lock active transform to X (Red), Y (Green), or Z (Blue) axis across gizmo & drag (re-press unlocks).
+  - Left-Click / Enter: Confirm modal transform.
+  - Escape: Cancel modal transform and rollback history.
+  - Shift+C: Create and save camera at current screen position with wireframe frustum.
+  - C: Cycle between saved cameras with cubic ease-out transition.
+  - H: Global HUD toggle (hides all UI overlays for clean composition).
+
+--------------------------------------------------------------------------------
+5. DESIGN TOKENS & TYPOGRAPHY
+--------------------------------------------------------------------------------
+Palette:
+  --color-black-night: #07050F (Primary dark canvas and inset card surfaces)
+  --color-inferno:     #AE0D0A (Interactive accent pills, active tab badges, highlights)
+  --color-molten-lava: #740907 (Sidebar drawer accent, card headers, export button base)
+  --color-deep-purple: #521451 (Depth bevels and inner inset shadows)
+  --color-white-smoke: #F5F5F5 (Crisp typography, numbers, and heading labels)
+
+Typography:
+  - Primary Font: 'Rethink Sans', 'Plus Jakarta Sans', system-ui, sans-serif.
+  - Strict Monospace Ban: NEVER use 'font-mono' anywhere in the application. All labels, numbers, dimensions ('4px', '3px'), and badges must use 'Rethink Sans' (font-medium, font-bold).
+
+--------------------------------------------------------------------------------
+6. CRITICAL PITFALLS & MANDATORY RULES (FOR ALL LLMS)
+--------------------------------------------------------------------------------
+1. Memory Leak Rule in Viewport.tsx:
+   - Viewport.tsx useEffect MUST run on [] (mount once). Never add callback props to the dependency array. Callbacks must be held in useRefs. scene.destroy() MUST invoke renderer.forceContextLoss() and cancelAnimationFrame.
+
+2. Raycaster Hit-Test Rule in controls.ts:
+   - Raycaster MUST use recursive = true across rig.root.traverse and check child.userData.isBodyPart === true. Non-recursive raycasting misses limb meshes wrapped in joint socket groups.
+
+3. Rotation Direction Rule in controls.ts:
+   - Dragging mouse up rotates limb upward; dragging mouse down rotates limb downward. Never invert sign on the rotation delta angle. Free rotation axis is calculated via crossVectors(dragVector, camForward).
+
+4. Export Ground Grid Rule in exporter.ts:
+   - exporter.ts MUST set stage.grid.visible = false before offscreen snapshot, and restore it post-render. Gridlines must never appear in final PNG exports.
+
+5. Auto-Detection Rule in skin.ts:
+   - Never reintroduce manual Steve vs Alex radio buttons. The engine auto-detects arm thickness from texture alpha at (55, 20..28) on file load.
+
+6. Export Canvas Buffer Rule in exporter.ts:
+   - NEVER read domElement.width/height to restore canvas size. Use renderer.getSize(vec) and renderer.getPixelRatio(). Set pixelRatio to 1 during export snapshot, and restore pixelRatio + setSize(prevSize.x, prevSize.y, true) post-export to prevent exponential buffer explosion (DPR^N) and low-FPS wireframe aliasing.
+
+7. Pill Curvature & High-DPI Toolbar Geometry Rule:
+   - For any rounded-full pill with height H, inner horizontal padding MUST be >= H/2 (e.g. >= 11.5px for 23px height) to prevent icons/text from colliding with curved endcaps.
+   - Sibling items inside fixed panels must satisfy W_container >= Pad_L + sum(W_i) + sum(Gap_j) + Pad_R. Flexible items inside fixed toolbars must always pair 'flex-1' with 'min-w-0' to prevent Windows DirectWrite subpixel font expansion from pushing sibling buttons outside the panel.
+8. Camera FOV Isolation Rule in cameraManager.ts:
+   - Custom high FOV belongs exclusively to camera view and offscreen export renders. OrbitControls start event immediately resets viewport FOV to 38 deg and clears activeCameraId to null so wide-angle distortion never lingers in free navigation.
+
+9. Responsive Dock & No Hardcoded Inner Width Rule:
+   - NEVER hardcode fixed pixel widths on card interiors (e.g. w-[183px], w-[167px]). Cards inside sidebars must use mx-auto w-[calc(100%-16px)] for symmetrical 8px margins.
+   - Inner input boxes, preset grids, and sliders must always use w-full with fluid flex-1 or grid-cols-* columns.
+   - Segmented tab groups must use fluid sliding pill indicator tracks (duration-300 ease-spring) with pointer-events-none on the indicator, never instantaneous color snapping.
+10. Origin Pop-Out & Button Child Pointer Hit Rule:
+    - Interactive buttons triggering origin-based modal pop-outs MUST add 'pointer-events-none select-none' to inner icons and text spans, and extract bounds via e.currentTarget.getBoundingClientRect() so sub-element targeting never disrupts origin or event bubbling.
+    - Modals animating from button origins into view must force DOM reflow (void modalRef.current.offsetHeight) and wait on double requestAnimationFrame before toggling isAnimated = true, guaranteeing browser paint commit of initial translate/scale before CSS transition triggers.
+11. Lighting Engine, Floating Modifier & Export Isolation Rule:
+    - Lights are 3D raycastable objects (userData.isLight = true) treated identically to models: G (grab) and R (rotate) hook directly into light groups with axis constraints (X/Y/Z).
+    - FloatingLightModal tracks projected 3D coordinates (with frustum & behind-camera culling) and auto-unmounts immediately when activeLightId is null (empty canvas click, Escape, or model click).
+    - In offscreen 4K exports (exporter.ts), light glyphs must be hidden before render and restored cleanly post-render.
+================================================================================

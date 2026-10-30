@@ -1,0 +1,110 @@
+================================================================================
+ANIMATION SYSTEM SPECIFICATION & USAGE GUIDE (`animation-sys.txt`)
+================================================================================
+Target: Fast declarative and imperative state-to-state UI transitions with Apple fluid curves.
+
+--------------------------------------------------------------------------------
+0. TRANSITION VS. ANIMATION: CORE ARCHITECTURAL PRINCIPLE
+--------------------------------------------------------------------------------
+CSS Transition (transition: property duration curve):
+  - Two-state interpolation: state A -> state B.
+  - Requires user input or condition change (hover, active, isCollapsed, isOpen).
+  - Use for: drawers sliding in/out, minimizing deck, active click depression, sliding pills.
+
+CSS Animation (animation: name duration curve):
+  - Multi-stage keyframe timeline: 0% -> 55% -> 80% -> 100%.
+  - Procedural physics: runs independently without requiring intermediate input states.
+  - Use for: .animate-bar-spring when opening the RightDeck bar as a single solid entity.
+
+--------------------------------------------------------------------------------
+1. PRESET CURVES & TIMING TOKENS (`src\utils\motion.tsx` & `src\index.css`)
+--------------------------------------------------------------------------------
+Name     CSS Curve Value                     Use Case
+spring   cubic-bezier(0.16, 1, 0.3, 1)       Default iOS/macOS fluid spring. Modals, drawers, cards.
+snappy   cubic-bezier(0.25, 1, 0.5, 1)       Fast micro-tap response. Toggles, pills, active tabs.
+smooth   cubic-bezier(0.4, 0, 0.2, 1)        Standard continuous UI morphing. Resizes, accordions.
+bounce   cubic-bezier(0.34, 1.56, 0.64, 1)   Tactile overshoot. Badges, checkmarks, alerts.
+soft     cubic-bezier(0.25, 0.1, 0.25, 1)    Gentle background fades, vignettes.
+
+Keyframe Utility:
+  .animate-bar-spring: 380ms multi-stage spring jump with +12% overshoot on the entire bar container.
+
+--------------------------------------------------------------------------------
+2. SLIDING BACKGROUND PILL PATTERNS
+--------------------------------------------------------------------------------
+A. 2D 2x2 Grid (Render Pass in LeftSidebar.tsx - Lunacy AST):
+   Indicator: absolute top-0 left-0 w-1/2 h-1/2 bg-[#AD0D0A] flush quadrant
+   Curves: transition-all duration-300 ease-spring
+   Translations & Inner Fillet Corner:
+     - beauty: translate-x-0 translate-y-0 rounded-br-[16px]
+     - wem:    translate-x-full translate-y-0 rounded-bl-[16px]
+     - normal: translate-x-0 translate-y-full rounded-tr-[16px]
+     - clown:  translate-x-full translate-y-full rounded-tl-[16px]
+
+B. 1D Horizontal Track (BottomNav.tsx):
+   Indicator: absolute top-1 bottom-1 left-1 w-[calc(50%-4px)] bg-[#AE0D0A] rounded-full shadow-[inset_0_4px_4px_#521451]
+   Curves: transition-all duration-300 ease-spring
+   Translations:
+     - presets:   translateX(0px)
+     - shortcuts: translateX(calc(100% + 6px))
+   Minimization: opacity-0 scale-75 when deck is minimized; opacity-100 scale-100 when open.
+
+C. 3-Column Track & iOS Switch (ExportModal.tsx):
+   Resolution Pill: absolute top-1 bottom-1 left-1 w-[calc((100%-8px)/3)] bg-[#AE0D0A] rounded-lg shadow-[inset_0_2px_4px_#521451]
+   Curves: transition-transform duration-250 ease-spring
+   Translations:
+     - 1080p: translateX(0%)
+     - 2k:    translateX(100%)
+     - 4k:    translateX(200%)
+   Toggle Switch: w-10 h-6 rounded-full p-1 (active: bg-[#AE0D0A], off: bg-[#1a1435]) with w-4 h-4 white thumb translating between translateX(0px) and translateX(16px) with duration-250 ease-spring.
+
+D. 1D 3-Tab Sliding Pill Segmented Track (LeftSidebar.tsx - Mode Strip):
+   Track: relative w-full h-[26px] bg-[#730907] p-[3px] flex items-center
+   Indicator: absolute top-[3px] bottom-[3px] left-[3px] w-[calc((100%-6px)/3)] rounded-full bg-[#AE0D0A] pointer-events-none
+   Curves: transition-transform duration-300 ease-spring
+   Translations:
+     - BODY:  translateX(0%)
+     - POSE:  translateX(100%)
+     - WORLD: translateX(200%)
+   Labels: relative z-10 flex-1 h-full font-bold text-[9px] uppercase tracking-wider text-[#F5F5F5] with transition-colors duration-200.
+
+--------------------------------------------------------------------------------
+3. UNIFIED BAR & HORIZONTAL CAROUSEL RAIL (RightDeck.tsx)
+--------------------------------------------------------------------------------
+A. Singular Entity Bar:
+   The outer <aside> bar animates as one cohesive physical block with zero DOM unmounting:
+     - Open:      opacity-100 translate-y-0 scale-100 (duration-350 ease-spring)
+     - Minimized: opacity-0 translate-y-12 scale-90 pointer-events-none (duration-350 ease-spring)
+
+B. Horizontal Content Carousel (Presets <-> Shortcuts):
+   Rail: w-[200%] h-full flex flex-row transition-transform duration-320 ease-spring
+     - presets:   translateX(0%)
+     - shortcuts: translateX(-50%)
+   Zero flashing, zero re-mounting; silky-smooth horizontal slide between panes.
+
+--------------------------------------------------------------------------------
+4. TACTILE CLICK CURVES (CLICK-DOWN vs. RELEASE)
+--------------------------------------------------------------------------------
+Buttons, Cards & Tabs:
+  - On Click Down (active): active:scale-[0.93] active:duration-100 ease-snappy
+  - On Release / Hover:    hover:scale-[1.02] transition-all duration-200 ease-spring
+
+--------------------------------------------------------------------------------
+5. DECLARATIVE REACT COMPONENT (`<Animate />`)
+--------------------------------------------------------------------------------
+Import:
+  import { Animate } from '../utils/motion';
+
+Pattern:
+  <Animate
+    show={booleanCondition}
+    from={{ <starting CSS properties> }}
+    to={{ <ending CSS properties> }}
+    curve="spring"     // 'spring' | 'snappy' | 'smooth' | 'bounce' | 'soft' (default: 'spring')
+    duration={300}     // milliseconds (default: 300)
+    delay={0}          // milliseconds (default: 0)
+    className="w-full" // optional wrapper class
+  >
+    <ChildComponent />
+  </Animate>
+================================================================================
