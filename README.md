@@ -2,93 +2,69 @@
 
 > NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.
 >
-> Early Alpha (v0.1.0-alpha): Active development preview. Core rigging, staging, and compositing pipelines are operational; workflows and UI controls are subject to ongoing refinement.
+> Early Alpha (v0.1.0-alpha): Active development preview. Posing, lighting, and 4K export passes are fully functional; tools and interface are actively being updated.
 
-A high-performance, browser-based 3D Minecraft skin posing, staging, and compositing render engine built with React 19, Three.js, and Tailwind CSS v4.
+A fast, free tool in your browser to pose Minecraft skins, set up custom lighting, and export Photoshop-ready cutouts for YouTube thumbnails. No heavy 3D software required.
 
 ---
 
 ## Overview
 
 ![MCRndr Posing Viewport](.github/assets/hero-viewport.png)
-<p align="center"><sub>Figure 1: Character staging workspace with real-time limb transform gizmo, numerical pose controls, and world-space camera frustums.</sub></p>
+<p align="center"><sub>Figure 1: Main staging workspace. Click any limb to rotate or move it, tweak angles, and view camera placements.</sub></p>
 
 ---
 
-## Interface & Camera Staging
+## Camera Angles & Framing
 
-| Clean Viewport (Collapsed UI) | Active Camera Lens (Framing Crosshairs) |
+| Clean Stage (Hidden UI) | Camera View (Framing Guide) |
 | :---: | :---: |
 | ![Clean Viewport](.github/assets/clean-viewport.png) | ![Camera View](.github/assets/camera-view.png) |
-| <sub>Figure 2: Distraction-free 3D stage featuring ground reference grid and light wireframe glyphs.</sub> | <sub>Figure 3: Dedicated camera perspective rendering through user-configured lens with alignment crosshairs.</sub> |
+| <sub>Figure 2: Full-screen view showing your character, ground grid, and light markers.</sub> | <sub>Figure 3: Dedicated camera view with center crosshairs to frame thumbnail action shots.</sub> |
 
 ---
 
-## Compositing Render Passes
+## Photoshop-Ready Export Passes
 
-MCRndr exports offscreen multi-pass layers at 1080p, 2K, and 4K resolutions with transparent background support for post-production compositing in external editing suites:
+MCRndr exports transparent PNGs up to 4K resolution. Instead of just a flat picture, it gives you dedicated layers tailored for thumbnail designing in Photoshop, Photopea, or GIMP:
 
-| Beauty Pass | Clown ID Pass |
+| Beauty Render | Clown Selection Mask |
 | :---: | :---: |
 | ![Beauty Pass](.github/assets/pass-beauty.png) | ![Clown ID Pass](.github/assets/pass-clown-id.png) |
-| <sub>Figure 4: Standard beauty pass with directional lighting, skin diffuse maps, and soft contact shadows.</sub> | <sub>Figure 5: Discrete RGB clown masks isolating each anatomical limb for selection clipping.</sub> |
-| Normal Pass | White Entities Mask (WEM) |
+| <sub>Figure 4: Fully shaded character with lighting and soft shadows on a clean transparent background.</sub> | <sub>Figure 5: Color-coded limbs. Use Photoshop Magic Wand (Tolerance 0) to select arms, legs, or head in one click.</sub> |
+| Normal Map (Rim Lighting) | Silhouette Cutout (WEM) |
 | ![Normal Pass](.github/assets/pass-normal.png) | ![WEM Pass](.github/assets/pass-wem-mask.png) |
-| <sub>Figure 6: Camera-space surface normals mapped to RGB color channels for relighting workflows.</sub> | <sub>Figure 7: High-contrast silhouette matte with jacket and outer sleeve alpha transparency.</sub> |
+| <sub>Figure 6: Directional surface colors. Blend in Photoshop to paint realistic rim lights, glows, and reflections.</sub> | <sub>Figure 7: Pure white character shape. Perfect for creating thick thumbnail outlines, sticker strokes, or drop shadows.</sub> |
 
 ---
 
-## Features
+## Built for Thumbnail Creators
 
-- Dual-Rig Architecture: Full Steve (4px) and Alex (3px) articulated rigs with anatomical pivot points and dual-layer outer mesh rendering.
-- Automatic Skin Model Detection: Inspects uploaded skin textures at runtime to automatically detect and assign Steve or Alex arm geometry.
-- Blender-Style Modal Transforms: Grab (G) and Rotate (R) hotkeys with axis constraints (X, Y, Z) and visual projection lines.
-- Multi-Camera Staging: Position, track, and switch between multiple perspective cameras with FOV controls and viewport frustum gizmos.
-- 3D Lighting Engine: Raycastable Sun and Point light glyphs with customizable intensity, color, and shadow modes (Realistic vs Minecrafty).
-- Compositing Render Passes: High-resolution offscreen multi-pass exports at 1080p, 2K, and 4K:
-  - Beauty Pass: Full standard shading with diffuse textures and shadows.
-  - WEM Pass: White Entities Mask for post-production silhouette clipping.
-  - Normal Pass: World/camera-space normals mapped to RGB color channels.
-  - Clown ID Pass: Discrete flat RGB limb isolation masks for effortless selection.
-- Posing System: Pre-built pose presets and an interactive 60-state undo/redo history engine.
+- Drag & Drop Any Skin: Drop your .png skin directly into the window. MCRndr automatically detects classic 4px Steve arms or 3px slim Alex arms, plus jackets, hats, and outer 3D layers.
+- Simple Limb Posing: Click limbs to rotate and translate them. Use preset buttons (Running, Walking, Pointing) for quick starts, or hotkeys (G to move, R to rotate).
+- Unlimited Undo: Hit Ctrl+Z anytime. 60 steps of history keep your posing stress-free.
+- Dynamic Lighting: Click and drag sun and point lights in 3D space. Switch between realistic soft shadows or authentic in-game blocky lighting.
+- Multiple Cameras: Create multiple camera angles around your character, change FOV for dramatic wide-angle perspectives, and switch angles instantly.
+- High-Resolution Exports: Save individual renders or batch export all compositing passes at 1080p, 2K, or 4K with clean transparent alpha backgrounds.
 
 ---
 
-## Tech Stack
+## Quick Start (Run Locally)
 
-- Framework: React 19 + TypeScript
-- Bundler & Tooling: Vite 6
-- 3D Engine: Three.js (r174)
-- Styling: Tailwind CSS v4
-- Icons: Lucide React
+### Requirements
 
----
+Node.js (v18 or newer) and npm.
 
-## Getting Started
-
-### Prerequisites
-
-Node.js (v18 or higher recommended) and npm.
-
-### Installation
+### Setup
 
 ```bash
 git clone https://github.com/CaptainBirdeloper/MCRndr.git
 cd MCRndr
 npm install
-```
-
-### Development
-
-```bash
 npm run dev
 ```
 
-### Production Build
-
-```bash
-npm run build
-```
+Open the displayed localhost URL in your browser to start posing.
 
 ---
 
