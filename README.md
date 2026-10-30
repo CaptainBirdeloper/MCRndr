@@ -6,6 +6,36 @@ A high-performance, browser-based 3D Minecraft skin posing, staging, and composi
 
 ---
 
+## Overview
+
+![MCRndr Posing Viewport](.github/assets/hero-viewport.png)
+<p align="center"><sub>Figure 1: Character staging workspace with real-time limb transform gizmo, numerical pose controls, and world-space camera frustums.</sub></p>
+
+---
+
+## Interface & Camera Staging
+
+| Clean Viewport (Collapsed UI) | Active Camera Lens (Framing Crosshairs) |
+| :---: | :---: |
+| ![Clean Viewport](.github/assets/clean-viewport.png) | ![Camera View](.github/assets/camera-view.png) |
+| <sub>Figure 2: Distraction-free 3D stage featuring ground reference grid and light wireframe glyphs.</sub> | <sub>Figure 3: Dedicated camera perspective rendering through user-configured lens with alignment crosshairs.</sub> |
+
+---
+
+## Compositing Render Passes
+
+MCRndr exports offscreen multi-pass layers at 1080p, 2K, and 4K resolutions with transparent background support for post-production compositing in external editing suites:
+
+| Beauty Pass | Clown ID Pass |
+| :---: | :---: |
+| ![Beauty Pass](.github/assets/pass-beauty.png) | ![Clown ID Pass](.github/assets/pass-clown-id.png) |
+| <sub>Figure 4: Standard beauty pass with directional lighting, skin diffuse maps, and soft contact shadows.</sub> | <sub>Figure 5: Discrete RGB clown masks isolating each anatomical limb for selection clipping.</sub> |
+| Normal Pass | White Entities Mask (WEM) |
+| ![Normal Pass](.github/assets/pass-normal.png) | ![WEM Pass](.github/assets/pass-wem-mask.png) |
+| <sub>Figure 6: Camera-space surface normals mapped to RGB color channels for relighting workflows.</sub> | <sub>Figure 7: High-contrast silhouette matte with jacket and outer sleeve alpha transparency.</sub> |
+
+---
+
 ## Features
 
 - Dual-Rig Architecture: Full Steve (4px) and Alex (3px) articulated rigs with anatomical pivot points and dual-layer outer mesh rendering.
