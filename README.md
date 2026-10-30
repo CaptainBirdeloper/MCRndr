@@ -1,6 +1,8 @@
-# MCRndr
+# MCRndr (Alpha)
 
 > NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.
+>
+> Early Alpha (v0.1.0-alpha): Active development preview. Core rigging, staging, and compositing pipelines are operational; workflows and UI controls are subject to ongoing refinement.
 
 A high-performance, browser-based 3D Minecraft skin posing, staging, and compositing render engine built with React 19, Three.js, and Tailwind CSS v4.
 
