@@ -28,9 +28,9 @@ export function CameraDropdown({ stage }: CameraDropdownProps) {
     };
   }, [stage]);
 
-  // Click outside to close
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
+      // EDGE CASE: e.target might not be a valid Node or already unmounted, causing contains() to fail
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setIsOpen(false);
       }
@@ -45,6 +45,7 @@ export function CameraDropdown({ stage }: CameraDropdownProps) {
 
   const hasCameras = cameras.length > 0;
   const activeCam = cameras.find((c) => c.id === activeCameraId);
+  // EDGE CASE: name could be undefined or null if camera name is unassigned, throwing TypeError on .replace()
   const formatCamName = (name: string) => name.replace(/\s+/g, '').toUpperCase();
   const displayName = hasCameras ? (activeCam ? formatCamName(activeCam.name) : 'FREE VIEW') : 'CREATE CAMERA +';
 
@@ -55,7 +56,6 @@ export function CameraDropdown({ stage }: CameraDropdownProps) {
 
   return (
     <div ref={dropdownRef} className="fixed top-3 right-6 z-40 select-none font-['Arial',sans-serif]">
-      {/* Closed State Pill (Anti-clipping min-w-auto, exact bg #360403, radius 15px) */}
       {!isOpen && (
         <button
           type="button"
@@ -77,7 +77,6 @@ export function CameraDropdown({ stage }: CameraDropdownProps) {
         </button>
       )}
 
-      {/* Expanded State Dropdown (Anti-clipping min-w-auto, vertical rhythm) */}
       {isOpen && (
         <div className="min-w-[105px] w-auto max-h-[140px] overflow-y-auto bg-[#360403] rounded-[8px] p-1 flex flex-col gap-0.5 custom-deck-scrollbar border-0 shadow-none">
           {cameras.map((cam) => {

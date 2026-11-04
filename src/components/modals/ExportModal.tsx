@@ -25,25 +25,22 @@ export function ExportModal({ stage, activePass, onClose }: ExportModalProps) {
     return stage.controlsManager.getCameraById(selectedCamId);
   };
 
-  const handleSingleExport = async () => {
+  const runExport = async (action: () => Promise<void>) => {
     if (!stage || isExporting) return;
     setIsExporting(true);
     try {
-      await exportSinglePass(stage, activePass, resolution, transparent, getTargetCamera());
+      // EDGE CASE: missing catch block leaves export errors (e.g. canvas security taint, WebGL context loss) unhandled with no user notification
+      await action();
     } finally {
       setIsExporting(false);
     }
   };
 
-  const handleAllExport = async () => {
-    if (!stage || isExporting) return;
-    setIsExporting(true);
-    try {
-      await exportAllPasses(stage, resolution, transparent, getTargetCamera());
-    } finally {
-      setIsExporting(false);
-    }
-  };
+  const handleSingleExport = () =>
+    runExport(() => exportSinglePass(stage!, activePass, resolution, transparent, getTargetCamera()));
+
+  const handleAllExport = () =>
+    runExport(() => exportAllPasses(stage!, resolution, transparent, getTargetCamera()));
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 transition-opacity duration-200 ease-smooth">
@@ -56,7 +53,6 @@ export function ExportModal({ stage, activePass, onClose }: ExportModalProps) {
         className="w-full max-w-sm"
       >
         <div className="relative w-full bg-[#07050F] border border-[#740907] rounded-2xl p-5 shadow-2xl flex flex-col gap-4 text-[#F5F5F5]">
-        {/* Header */}
         <div className="flex items-center justify-between pb-2 border-b border-[#740907]/60">
           <div className="flex items-center gap-2">
             <Download className="w-4 h-4 text-[#AE0D0A]" />
@@ -72,13 +68,11 @@ export function ExportModal({ stage, activePass, onClose }: ExportModalProps) {
           </button>
         </div>
 
-        {/* Resolution Selector with Sliding Pill */}
         <div className="flex flex-col gap-1.5">
           <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider font-['Rethink_Sans']">
             Resolution
           </label>
           <div className="relative grid grid-cols-3 p-1 bg-[#120e24] rounded-xl border border-[#740907]/40">
-            {/* Sliding Background Indicator Pill */}
             <div
               className="absolute top-1 bottom-1 left-1 w-[calc((100%-8px)/3)] bg-[#AE0D0A] rounded-lg transition-transform duration-250 ease-spring pointer-events-none"
               style={{
@@ -108,7 +102,6 @@ export function ExportModal({ stage, activePass, onClose }: ExportModalProps) {
           </div>
         </div>
 
-        {/* Camera View Selector Dropdown */}
         <div className="flex flex-col gap-1.5">
           <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider font-['Rethink_Sans']">
             Camera View
@@ -123,6 +116,7 @@ export function ExportModal({ stage, activePass, onClose }: ExportModalProps) {
                 Current Viewport
               </option>
               {cameras.map((c) => (
+                // EDGE CASE: c.name being undefined or empty will throw TypeError on charAt
                 <option key={c.id} value={c.id} className="bg-[#07050F] text-[#F5F5F5]">
                   {c.name.charAt(0).toUpperCase() + c.name.slice(1)}
                 </option>
@@ -136,7 +130,6 @@ export function ExportModal({ stage, activePass, onClose }: ExportModalProps) {
           </div>
         </div>
 
-        {/* Background Alpha Toggle (iOS-style Animated Switch) */}
         <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#120e24] border border-[#740907]/40">
           <span className="text-xs text-zinc-200 font-medium font-['Rethink_Sans']">
             Transparent Alpha Background
@@ -156,7 +149,6 @@ export function ExportModal({ stage, activePass, onClose }: ExportModalProps) {
           </button>
         </div>
 
-        {/* Action Buttons */}
         <div className="flex flex-col gap-2 pt-1">
           <button
             disabled={isExporting}

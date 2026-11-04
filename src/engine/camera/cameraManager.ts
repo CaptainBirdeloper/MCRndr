@@ -40,20 +40,22 @@ export function createCameraManager(
   let cameraAnimId = 0;
   const cameraChangeListeners: Array<(items: CameraItem[], activeId: string | null) => void> = [];
 
-  function notifyCameraChange() {
-    cameras.forEach((c) => {
-      c.helper.visible = c.visible && c.id !== activeCameraId;
-    });
-
-    const items: CameraItem[] = cameras.map((c) => ({
+  function getCameras(): CameraItem[] {
+    return cameras.map((c) => ({
       id: c.id,
       name: c.name,
       visible: c.visible,
       fov: Math.round(c.camera.fov),
     }));
+  }
+
+  function notifyCameraChange() {
+    cameras.forEach((c) => {
+      c.helper.visible = c.visible && c.id !== activeCameraId;
+    });
 
     cameraChangeListeners.forEach((cb) => {
-      cb(items, activeCameraId);
+      cb(getCameras(), activeCameraId);
     });
   }
 
@@ -172,6 +174,7 @@ export function createCameraManager(
     scene.remove(removed.helper);
     removed.helper.dispose();
 
+    // EDGE CASE: deleting active camera leaves main viewport at deleted camera position without syncing to the fallback camera
     if (activeCameraId === id) {
       activeCameraId = cameras[Math.max(0, index - 1)]?.id || null;
     }
@@ -181,6 +184,7 @@ export function createCameraManager(
   function setCameraFov(id: string, fov: number) {
     const target = cameras.find((c) => c.id === id);
     if (!target) return;
+    // EDGE CASE: NaN passed as fov will result in NaN after Math.min/max, corrupting camera projection matrix
     const clamped = Math.max(10, Math.min(120, fov));
     target.camera.fov = clamped;
     target.camera.updateProjectionMatrix();
@@ -200,6 +204,7 @@ export function createCameraManager(
   let perpetualFov = 38;
 
   function setPerpetualFov(fov: number) {
+    // EDGE CASE: NaN passed as fov propagates through Math.min/max, corrupting perpetualFov and camera projection
     perpetualFov = Math.max(20, Math.min(90, fov));
     if (activeCameraId === null) {
       camera.fov = perpetualFov;
@@ -246,13 +251,7 @@ export function createCameraManager(
     getCameraFov,
     setPerpetualFov,
     getPerpetualFov,
-    getCameras: () =>
-      cameras.map((c) => ({
-        id: c.id,
-        name: c.name,
-        visible: c.visible,
-        fov: Math.round(c.camera.fov),
-      })),
+    getCameras,
     getActiveCameraId: () => activeCameraId,
     getCameraById: (id: string) => {
       const found = cameras.find((c) => c.id === id);

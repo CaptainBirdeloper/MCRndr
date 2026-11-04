@@ -35,6 +35,7 @@ export function createScene(
   container: HTMLDivElement,
   onSelectionChange?: (part: BodyPartName | null, rotDeg: [number, number, number]) => void
 ): SceneStage {
+  // EDGE CASE: container and window height of 0 causes division by zero (NaN aspect ratio), corrupting camera projection matrix
   const width = container.clientWidth || window.innerWidth;
   const height = container.clientHeight || window.innerHeight;
 
@@ -67,8 +68,8 @@ export function createScene(
   controls.minDistance = 0.8;
   controls.update();
 
-  // Studio Lighting Manager (Key, Fill, Rim, Ambient)
   const lightingManager = createLightingManager(scene, renderer);
+  // EDGE CASE: fallback DirectionalLight is never added to scene, silently disconnecting light controls from rendering
   const keyLight = (lightingManager.getLightGroupById('light_key_light')?.children[0] as THREE.DirectionalLight) || new THREE.DirectionalLight();
   const fillLight = (lightingManager.getLightGroupById('light_fill_light')?.children[0] as THREE.DirectionalLight) || new THREE.DirectionalLight();
   const rimLight = (lightingManager.getLightGroupById('light_rim_light')?.children[0] as THREE.DirectionalLight) || new THREE.DirectionalLight();
@@ -83,21 +84,17 @@ export function createScene(
   ground.position.y = 0;
   scene.add(ground);
 
-  // Subtle Studio Grid matching Lunacy Crimson Theme
   const grid = new THREE.GridHelper(10, 20, 0x730907, 0x1f0b18);
   grid.position.y = 0.001;
   scene.add(grid);
 
-  // Initialize Minecraft Rig
   const defaultCanvas = createSteveDefaultCanvas();
   const defaultTexture = createSkinTexture(defaultCanvas);
   const rig = createMinecraftRig(defaultTexture, 'steve');
   scene.add(rig.root);
 
-  // Initialize Shader Passes
   const shaderManager = new ShaderPassManager(rig, defaultTexture);
 
-  // Initialize Rig Controls & Transform Gizmo
   const controlsManager = setupRigControls(
     scene,
     camera,
@@ -120,6 +117,7 @@ export function createScene(
       const reader = new FileReader();
       reader.onload = (e) => {
         const img = new Image();
+        // EDGE CASE: img.onerror rejection on corrupt or invalid image data will cause unhandled Promise rejections if caller lacks try/catch
         img.onload = () => {
           const tex = createSkinTexture(img);
           const detectedArm = detectSkinModel(img);
@@ -148,7 +146,7 @@ export function createScene(
   animate();
 
   function resize() {
-    if (!container) return;
+    // EDGE CASE: container clientHeight of 0 during resize causes division by zero, breaking camera projection with NaN/Infinity
     const w = container.clientWidth;
     const h = container.clientHeight;
     camera.aspect = w / h;

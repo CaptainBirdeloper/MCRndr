@@ -49,7 +49,7 @@ export function Animate({
 }: AnimateProps) {
   const currentStyle = useMemo<React.CSSProperties>(() => {
     const targetState = show ? to : from;
-    const easing = CURVES[curve] ?? CURVES.spring;
+    const easing = CURVES[curve];
     return {
       ...targetState,
       transition: `all ${duration}ms ${easing} ${delay}ms`,
@@ -81,7 +81,8 @@ export function animate(
   }
 ): Animation | null {
   if (!element) return null;
-  const easing = CURVES[options?.curve ?? 'spring'] ?? CURVES.spring;
+  const easing = CURVES[options?.curve ?? 'spring'];
+  // EDGE CASE: element.animate may be undefined in environments lacking Web Animations API support (e.g. JSDOM), throwing TypeError
   return element.animate([from, to], {
     duration: options?.duration ?? 300,
     delay: options?.delay ?? 0,

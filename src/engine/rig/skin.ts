@@ -12,18 +12,17 @@ export function createSteveDefaultCanvas(): HTMLCanvasElement {
   const canvas = document.createElement('canvas');
   canvas.width = 64;
   canvas.height = 64;
+  // EDGE CASE: canvas.getContext('2d') can return null in memory-constrained environments or if disabled by canvas blocker extensions
   const ctx = canvas.getContext('2d')!;
 
   ctx.fillStyle = '#00000000';
   ctx.clearRect(0, 0, 64, 64);
 
-  // Helper rect filler
   const fill = (x: number, y: number, w: number, h: number, color: string) => {
     ctx.fillStyle = color;
     ctx.fillRect(x, y, w, h);
   };
 
-  // Head Hair & Skin base
   fill(0, 0, 32, 16, '#27180e'); // Hair top/sides
   fill(8, 8, 8, 8, '#b88365'); // Face base
   fill(8, 6, 8, 2, '#27180e'); // Hair bangs
@@ -58,10 +57,12 @@ export function createSteveDefaultCanvas(): HTMLCanvasElement {
 }
 
 export function detectSkinModel(source: HTMLImageElement | HTMLCanvasElement): import('../../types').ArmType {
+  // EDGE CASE: skin image with dimensions other than 64x64 or 64x32 (e.g. HD 128x128 skin or corrupt dimensions) defaults to 'steve' without scaling check
   if (source.height === 32) return 'steve';
   const canvas = document.createElement('canvas');
   canvas.width = 64;
   canvas.height = 64;
+  // EDGE CASE: getContext('2d') can return null, causing uncaught TypeError on drawImage
   const ctx = canvas.getContext('2d')!;
   ctx.drawImage(source, 0, 0);
 
@@ -79,8 +80,10 @@ export function createSkinTexture(source: HTMLCanvasElement | HTMLImageElement):
   const canvas = document.createElement('canvas');
   canvas.width = 64;
   canvas.height = 64;
+  // EDGE CASE: getContext('2d') can return null, causing uncaught TypeError on drawImage
   const ctx = canvas.getContext('2d')!;
 
+  // EDGE CASE: non-standard texture aspect ratios (e.g., non-64-width or HD 128x64 skins) will be incorrectly cropped or stretched without warning
   if (source.height === 32) {
     // Legacy 64x32: draw top half
     ctx.drawImage(source, 0, 0);
@@ -115,9 +118,11 @@ export function setMinecraftBoxUV(
   texHeight = 64
 ) {
   const { x, y, w, h, d } = uvBox;
+  // EDGE CASE: geo.attributes.uv is assumed to exist and have >= 24 vertices; custom or uninitialized geometries will crash
   const uvAttr = geo.attributes.uv;
 
   // Convert pixel coords to Three.js UV [0..1]
+  // EDGE CASE: texWidth or texHeight of 0 causes division by zero, producing NaN UV coordinates
   const toU = (px: number) => px / texWidth;
   const toV = (py: number) => 1.0 - py / texHeight;
 

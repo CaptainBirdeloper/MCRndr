@@ -38,16 +38,10 @@ export function Viewport({ onStageReady, onSkinLoaded, onSelectionChange }: View
     };
   }, []); // Run ONCE on mount! Never destroy scene on state updates!
 
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleDragState = (e: React.DragEvent, dragging: boolean) => {
     e.preventDefault();
     e.stopPropagation();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
+    setIsDragging(dragging);
   };
 
   const handleDrop = async (e: React.DragEvent) => {
@@ -57,6 +51,7 @@ export function Viewport({ onStageReady, onSkinLoaded, onSelectionChange }: View
 
     const file = e.dataTransfer.files?.[0];
     if (file && file.type === 'image/png' && stageRef.current) {
+      // EDGE CASE: loadSkinFile rejection on corrupt or invalid PNG causes unhandled Promise rejection without user error feedback
       const armType = await stageRef.current.loadSkinFile(file);
       onSkinLoadedRef.current?.(file.name, armType);
     }
@@ -65,15 +60,14 @@ export function Viewport({ onStageReady, onSkinLoaded, onSelectionChange }: View
   return (
     <div
       ref={containerRef}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
+      onDragOver={(e) => handleDragState(e, true)}
+      onDragLeave={(e) => handleDragState(e, false)}
       onDrop={handleDrop}
       className="relative w-full h-full bg-[#07050F] overflow-hidden"
     >
       {/* Viewport Vignette Overlay (pointer-events-none ensures zero click interception) */}
       <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_120px_rgba(0,0,0,0.85)] z-10" />
 
-      {/* Drag & Drop Overlay */}
       {isDragging && (
         <div className="absolute inset-4 z-30 rounded-2xl border-2 border-dashed border-[#AE0D0A] bg-[#740907]/40 backdrop-blur-md flex flex-col items-center justify-center gap-3 pointer-events-none transition-all">
           <UploadCloud className="w-12 h-12 text-[#AE0D0A] animate-bounce" />

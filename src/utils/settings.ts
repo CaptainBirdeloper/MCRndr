@@ -22,6 +22,7 @@ export function loadSettings(): UserSettings {
     const urlZoom = urlParams ? Number(urlParams.get('uiZoom')) : null;
 
     const raw = localStorage.getItem(STORAGE_KEY);
+    // EDGE CASE: JSON.parse('null') returns null, causing TypeError on parsed.uiZoom access before catch block
     const parsed = raw ? JSON.parse(raw) : {};
 
     const effectiveZoom =
@@ -47,6 +48,7 @@ export function saveSettings(settings: UserSettings): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
   } catch {
+    // EDGE CASE: silent failure when localStorage is disabled, sandboxed, or quota exceeded leaves user unaware settings were not persisted
     // Ignore quota errors
   }
 }

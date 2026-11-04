@@ -15,7 +15,6 @@ export function PosePresets({ activePoseId, onPoseSelect }: PosePresetsProps) {
         <Sparkles className="w-2.5 h-2.5 text-[#F5F5F5]/60" />
       </div>
 
-      {/* Responsive 2-Column Buttons (radius 15px, NO borders, NO inner shadow) */}
       <div className="grid grid-cols-2 gap-1.5 w-full">
         {POSE_PRESETS.map((preset) => {
           const isActive = activePoseId === preset.id;
@@ -38,7 +37,6 @@ export function PosePresets({ activePoseId, onPoseSelect }: PosePresetsProps) {
         })}
       </div>
 
-      {/* Plus Button (14x14, radius 15px, border-0) */}
       <button
         type="button"
         title="Add custom preset"

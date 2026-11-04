@@ -59,6 +59,7 @@ export interface RigControlsManager {
 function stripPlanarHandles(gizmoHelper: THREE.Object3D) {
   const gh = gizmoHelper as any;
   ['gizmo', 'picker', 'helper'].forEach((dictName) => {
+    // EDGE CASE: accessing private Three.js TransformControls internal hierarchy ('translate') may break across Three.js versions
     const parent = gh[dictName]?.['translate'];
     if (parent && Array.isArray(parent.children)) {
       for (let i = parent.children.length - 1; i >= 0; i--) {
@@ -88,7 +89,6 @@ export function setupRigControls(
   let space: 'local' | 'world' = 'local';
   let wholeBodyMode = true;
 
-  // Transform Gizmo
   const gizmo = new TransformControls(camera, domElement);
   gizmo.size = 0.75;
   gizmo.setMode('translate');
@@ -97,12 +97,10 @@ export function setupRigControls(
   stripPlanarHandles(gizmoHelper);
   scene.add(gizmoHelper);
 
-  // Selection outline / box helper
   const boxHelper = new THREE.BoxHelper(rig.root, 0x38bdf8);
   boxHelper.visible = false;
   scene.add(boxHelper);
 
-  // Sync gizmo when light is selected externally (e.g. from WORLD tab)
   lightingManager?.setSelectionListener((id) => {
     if (id) {
       selectedPart = null;
@@ -121,10 +119,8 @@ export function setupRigControls(
     }
   });
 
-  // Subsystem 1: Camera Manager
   const cameraManager = createCameraManager(scene, camera, orbitControls);
 
-  // Callbacks for UI Synchronization
   let rootTransformCb: ((pos: [number, number, number], rotDeg: [number, number, number]) => void) | null = null;
   let partTransformCb: ((part: BodyPartName, pos: [number, number, number], rotDeg: [number, number, number]) => void) | null = null;
 
@@ -143,6 +139,7 @@ export function setupRigControls(
   }
 
   function notifyAngleChange(part: BodyPartName) {
+    // EDGE CASE: rig.joints[part] may be undefined for unmapped or invalid part names, throwing TypeError on .group
     const rot = rig.joints[part].group.rotation;
     const deg: [number, number, number] = [
       Math.round((rot.x * 180) / Math.PI),
@@ -169,14 +166,12 @@ export function setupRigControls(
     notifyAngleChange(part);
   }
 
-  // Subsystem 2: History Engine
   const historyManager = createHistoryManager(rig, boxHelper, {
     notifyRootTransform,
     notifyPartTransform,
     notifyAngleChange,
   });
 
-  // Subsystem 3: Modal Transform Engine (G/R Drag & Axis Lock)
   const modalTransformEngine = createModalTransformEngine(
     scene,
     camera,
@@ -363,7 +358,6 @@ export function setupRigControls(
     }
   }
 
-  // Pointer tracking & hit-testing
   let pointerDownPos = { x: 0, y: 0 };
 
   function onPointerDown(e: MouseEvent) {
@@ -468,7 +462,7 @@ export function setupRigControls(
       e.preventDefault();
       const activeLightId = lightingManager?.getActiveLightId();
       if (activeLightId) {
-        const lightGroup = lightingManager?.getLightGroupById(activeLightId);
+        const lightGroup = lightingManager!.getLightGroupById(activeLightId);
         if (lightGroup) {
           setMode('translate');
           modalTransformEngine.startModalObject('translate', lightGroup);
@@ -484,7 +478,7 @@ export function setupRigControls(
       e.preventDefault();
       const activeLightId = lightingManager?.getActiveLightId();
       if (activeLightId) {
-        const lightGroup = lightingManager?.getLightGroupById(activeLightId);
+        const lightGroup = lightingManager!.getLightGroupById(activeLightId);
         if (lightGroup) {
           setMode('rotate');
           modalTransformEngine.startModalObject('rotate', lightGroup);
@@ -515,9 +509,9 @@ export function setupRigControls(
     }
   }
 
-  // Active pose interpolation animation handle
   let poseAnimId: number | null = null;
 
+  // EDGE CASE: durationMs <= 0 causes division by zero (NaN/Infinity progress), corrupting slerp quaternion interpolation
   function applyPose(preset: PosePreset, durationMs = 280) {
     modalTransformEngine.finishModal(selectedPart);
     if (poseAnimId) {
@@ -532,9 +526,7 @@ export function setupRigControls(
     Object.keys(rig.joints).forEach((name) => {
       const part = name as BodyPartName;
       const joint = rig.joints[part];
-      if (joint) {
-        prevRotations[part] = [joint.group.rotation.x, joint.group.rotation.y, joint.group.rotation.z];
-      }
+      prevRotations[part] = [joint.group.rotation.x, joint.group.rotation.y, joint.group.rotation.z];
     });
     const prevRootPos: [number, number, number] = [
       rig.root.position.x,
@@ -553,15 +545,15 @@ export function setupRigControls(
     Object.keys(rig.joints).forEach((name) => {
       const part = name as BodyPartName;
       const joint = rig.joints[part];
-      if (joint) {
-        startQuats[part] = joint.group.quaternion.clone();
-        const targetEulerArr = preset.rotations[part] || [0, 0, 0];
-        const targetEuler = new THREE.Euler(targetEulerArr[0], targetEulerArr[1], targetEulerArr[2]);
-        targetQuats[part] = new THREE.Quaternion().setFromEuler(targetEuler);
-      }
+      startQuats[part] = joint.group.quaternion.clone();
+      // EDGE CASE: preset.rotations may be undefined or limb array truncated, throwing TypeError or creating NaN Euler angles
+      const targetEulerArr = preset.rotations[part] || [0, 0, 0];
+      const targetEuler = new THREE.Euler(targetEulerArr[0], targetEulerArr[1], targetEulerArr[2]);
+      targetQuats[part] = new THREE.Quaternion().setFromEuler(targetEuler);
     });
 
     const startRootPos = rig.root.position.clone();
+    // EDGE CASE: preset.rootPosition with fewer than 3 coordinates will initialize Vector3 axes with undefined/NaN
     const targetRootPos = preset.rootPosition ? new THREE.Vector3(...preset.rootPosition) : new THREE.Vector3(0, 0, 0);
 
     const startRootQuat = rig.root.quaternion.clone();
@@ -619,7 +611,6 @@ export function setupRigControls(
     boxHelper.dispose();
   }
 
-  // Transform gizmo is default on launch
   if (wholeBodyMode) {
     selectPart('root');
   }
@@ -692,9 +683,7 @@ export function setupRigControls(
       Object.keys(rig.joints).forEach((k) => {
         const part = k as BodyPartName;
         const joint = rig.joints[part];
-        if (joint) {
-          rotations[part] = [joint.group.rotation.x, joint.group.rotation.y, joint.group.rotation.z];
-        }
+        rotations[part] = [joint.group.rotation.x, joint.group.rotation.y, joint.group.rotation.z];
       });
       return {
         id,

@@ -34,11 +34,11 @@ export async function capturePassImage(
   targetCamera?: THREE.PerspectiveCamera | null
 ): Promise<string> {
   const { renderer, scene, camera, controlsManager } = stage;
+  // EDGE CASE: unvalidated resolution key will return undefined from RESOLUTIONS, throwing TypeError on config.width
   const config = RESOLUTIONS[resolution];
 
   stage.isExporting = true;
 
-  // Save current state accurately using logical dimensions and device pixel ratio
   const prevSize = new THREE.Vector2();
   renderer.getSize(prevSize);
   const prevPixelRatio = renderer.getPixelRatio();
@@ -53,7 +53,6 @@ export async function capturePassImage(
   // Temporarily deselect part to remove gizmo/box helpers from render
   controlsManager.selectPart(null);
 
-  // If a specific camera is targeted, apply its transform
   if (targetCamera) {
     camera.position.copy(targetCamera.position);
     camera.quaternion.copy(targetCamera.quaternion);
@@ -61,7 +60,6 @@ export async function capturePassImage(
     camera.updateMatrixWorld(true);
   }
 
-  // Set pass and background
   stage.setShaderPass(pass);
   const prevBg = scene.background;
   scene.background = transparentBg ? null : new THREE.Color(0x000000);
@@ -69,12 +67,12 @@ export async function capturePassImage(
   // Always hide studio grid and camera wireframe helpers from exported renders
   const prevGridVisible = stage.grid.visible;
   stage.grid.visible = false;
-  const cameraHelpers = controlsManager.getCameraHelpers ? controlsManager.getCameraHelpers() : [];
+  const cameraHelpers = controlsManager.getCameraHelpers();
   const prevHelpersVisibility = cameraHelpers.map((h) => h.visible);
   cameraHelpers.forEach((h) => {
     h.visible = false;
   });
-  const lightGlyphs = stage.lightingManager?.getGlyphs() || [];
+  const lightGlyphs = stage.lightingManager.getGlyphs();
   const prevLightVisibility = lightGlyphs.map((g) => g.visible);
   lightGlyphs.forEach((g) => {
     g.visible = false;
@@ -86,17 +84,16 @@ export async function capturePassImage(
   camera.aspect = config.width / config.height;
   camera.updateProjectionMatrix();
 
-  // Render high-res frame
   renderer.render(scene, camera);
+  // EDGE CASE: toDataURL() can throw SecurityError if canvas is tainted by cross-origin textures or return 'data:,' on GPU memory exhaustion at 4K
   const dataUrl = renderer.domElement.toDataURL('image/png');
 
-  // Restore previous state
   stage.grid.visible = prevGridVisible;
   cameraHelpers.forEach((h, i) => {
-    h.visible = prevHelpersVisibility[i] ?? false;
+    h.visible = prevHelpersVisibility[i];
   });
   lightGlyphs.forEach((g, i) => {
-    g.visible = prevLightVisibility[i] ?? false;
+    g.visible = prevLightVisibility[i];
   });
 
   if (targetCamera) {
@@ -106,7 +103,6 @@ export async function capturePassImage(
     camera.updateMatrixWorld(true);
   }
 
-  // Restore renderer pixel ratio and size back to exact logical viewport dimensions
   renderer.setPixelRatio(prevPixelRatio);
   renderer.setSize(prevSize.x, prevSize.y, true);
   camera.aspect = prevAspect;
@@ -134,6 +130,7 @@ export async function exportSinglePass(
   targetCamera?: THREE.PerspectiveCamera | null
 ) {
   const dataUrl = await capturePassImage(stage, pass, resolution, transparentBg, targetCamera);
+  // EDGE CASE: Date.now().slice(-4) repeats every 10 seconds, causing filename collisions during repeated exports
   const time = Date.now().toString().slice(-4);
   downloadDataUrl(dataUrl, `mc_${pass}_${resolution}_${time}.png`);
 }
@@ -154,8 +151,10 @@ export async function exportAllPasses(
     { mode: 'clown', name: 'clown_id' },
   ];
 
+  // EDGE CASE: 4-digit timestamp slice easily collides across batch exports, overwriting files with identical timestamps
   const time = Date.now().toString().slice(-4);
 
+  // EDGE CASE: exception in intermediate pass halts loop without cleanup, leaving remaining passes un-exported
   for (const p of passes) {
     const dataUrl = await capturePassImage(stage, p.mode, resolution, transparentBg, targetCamera);
     downloadDataUrl(dataUrl, `mc_${p.name}_${resolution}_${time}.png`);

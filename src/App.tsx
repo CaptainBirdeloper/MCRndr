@@ -27,7 +27,6 @@ export function App() {
   const [activeLight, setActiveLight] = useState<LightItem | null>(null);
   const [lightScreenPos, setLightScreenPos] = useState<{ x: number; y: number } | null>(null);
 
-  // Unhighlight preset whenever undo is pressed or whenever any limb/body is transformed
   useEffect(() => {
     if (!stage) return;
     stage.controlsManager.setOnUndoListener(() => {
@@ -38,7 +37,6 @@ export function App() {
     });
   }, [stage]);
 
-  // Sync query params for testing state injection
   useEffect(() => {
     if (!stage) return;
     const params = new URLSearchParams(window.location.search);
@@ -48,6 +46,7 @@ export function App() {
     }
     const intensityParam = params.get('lightIntensity');
     if (intensityParam && selectLightParam) {
+      // EDGE CASE: parseFloat(intensityParam) can evaluate to NaN for non-numeric query values, corrupting light calculations
       stage.lightingManager.setLightIntensity(selectLightParam, parseFloat(intensityParam));
     }
     const styleParam = params.get('lightStyle');
@@ -59,7 +58,6 @@ export function App() {
     }
   }, [stage]);
 
-  // Track active light selection and 3D screen projection
   useEffect(() => {
     if (!stage) return;
     const lm = stage.lightingManager;
@@ -69,9 +67,7 @@ export function App() {
       setActiveLight(found);
     };
 
-    lm.setChangeListener((lights, activeId) => {
-      updateActiveLight(lights, activeId);
-    });
+    lm.setChangeListener(updateActiveLight);
 
     let animId: number;
     const trackLightPos = () => {
@@ -95,7 +91,6 @@ export function App() {
     };
   }, [stage]);
 
-  // Toggle HUD with 'H' key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
@@ -110,7 +105,6 @@ export function App() {
   const handlePoseSelect = (id: string) => {
     if (!stage) return;
 
-    // Apply 100% ABSOLUTE canonical preset
     const canonical = POSE_PRESETS.find((p) => p.id === id);
     if (canonical) {
       stage.controlsManager.applyPose(canonical);
@@ -119,6 +113,7 @@ export function App() {
   };
 
   const handleSkinLoaded = (name: string, detectedArm: ArmType) => {
+    // EDGE CASE: name may be undefined or null if file has no name, throwing TypeError on .replace()
     const cleanName = name.replace(/\.png$/i, '');
     setSkinName(cleanName);
     setArmType(detectedArm);
@@ -126,7 +121,6 @@ export function App() {
 
   return (
     <div className="relative w-screen h-screen bg-[#07050F] text-white font-['Rethink_Sans'] select-none overflow-hidden">
-      {/* 3D Viewport Engine */}
       <main className="w-full h-full absolute inset-0">
         <Viewport
           onStageReady={setStage}
@@ -138,16 +132,13 @@ export function App() {
         />
       </main>
 
-      {/* Lunacy UI Overlay System with UI Zoom (50% to 300%) */}
       {showHUD && (
         <div
           style={{ zoom: `${uiZoom}%` }}
           className="absolute inset-0 pointer-events-none z-40 [&>*]:pointer-events-auto"
         >
-          {/* Top-Right Camera Dropdown (Matches Screenshot 1 & 2) */}
           <CameraDropdown stage={stage} />
 
-          {/* Left Controls Drawer (BODY, POSE, Transform, Presets, Skin, Export) */}
           <LeftSidebar
             stage={stage}
             skinName={skinName}
@@ -166,7 +157,6 @@ export function App() {
         </div>
       )}
 
-      {/* 4K Multi-Pass Export Modal */}
       {showExportModal && (
         <ExportModal
           stage={stage}
@@ -175,7 +165,6 @@ export function App() {
         />
       )}
 
-      {/* Floating Light Modifier Modal (tracked to 3D position) */}
       {activeLight && lightScreenPos && (
         <FloatingLightModal
           light={activeLight}
@@ -187,7 +176,6 @@ export function App() {
         />
       )}
 
-      {/* Settings Modal with Dynamic Origin Spring Animation */}
       <SettingsModal
         isOpen={showSettingsModal}
         onClose={() => setShowSettingsModal(false)}

@@ -37,15 +37,12 @@ export function LeftSidebar({
   // Tab mode: 'BODY' (whole body transform), 'POSE' (part-wise limb posing), or 'WORLD' (camera/environment)
   const [activeTab, setActiveTab] = useState<'BODY' | 'POSE' | 'WORLD'>('BODY');
 
-  // Whole Body Transform State
   const [rootPos, setRootPos] = useState<[number, number, number]>([0, 0, 0]);
   const [rootRot, setRootRot] = useState<[number, number, number]>([0, 0, 0]);
 
-  // Selected Part Transform State (for POSE tab)
   const [partPos, setPartPos] = useState<[number, number, number]>([0, 0, 0]);
   const [partRot, setPartRot] = useState<[number, number, number]>([0, 0, 0]);
 
-  // Sync tab mode with stage controls wholeBodyMode
   const handleTabChange = (tab: 'BODY' | 'POSE' | 'WORLD') => {
     setActiveTab(tab);
     if (!stage) return;
@@ -76,7 +73,6 @@ export function LeftSidebar({
     setRootRot([...currentRoot.rotationDeg]);
   }, [stage]);
 
-  // Update part values whenever selected part changes
   useEffect(() => {
     if (!stage || !selectedPart || selectedPart === 'root') return;
     const currentPart = stage.controlsManager.getPartTransform(selectedPart);
@@ -84,7 +80,6 @@ export function LeftSidebar({
     setPartRot([...currentPart.rotationDeg]);
   }, [stage, selectedPart]);
 
-  // Press 1 for BODY, 2 for POSE
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
@@ -107,6 +102,7 @@ export function LeftSidebar({
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && stage) {
+      // EDGE CASE: loadSkinFile rejection on corrupt skin file causes unhandled Promise rejection and blocks re-upload
       const detectedArm = await stage.loadSkinFile(file);
       onSkinLoaded(file.name, detectedArm);
     }
@@ -144,27 +140,23 @@ export function LeftSidebar({
     }
   };
 
-  const handlePosChange = (axis: 'x' | 'y' | 'z', valStr: string) => {
+  const handleTransformAxisChange = (kind: 'pos' | 'rot', axis: 'x' | 'y' | 'z', valStr: string) => {
     const val = parseFloat(valStr) || 0;
     if (stage) {
       if (activeTab === 'BODY') {
-        stage.controlsManager.setRootPosition(axis, val);
+        kind === 'pos'
+          ? stage.controlsManager.setRootPosition(axis, val)
+          : stage.controlsManager.setRootRotation(axis, val);
       } else if (selectedPart && selectedPart !== 'root') {
-        stage.controlsManager.setPartPosition(selectedPart, axis, val);
+        kind === 'pos'
+          ? stage.controlsManager.setPartPosition(selectedPart, axis, val)
+          : stage.controlsManager.setPartRotation(selectedPart, axis, val);
       }
     }
   };
 
-  const handleRotChange = (axis: 'x' | 'y' | 'z', valStr: string) => {
-    const val = parseFloat(valStr) || 0;
-    if (stage) {
-      if (activeTab === 'BODY') {
-        stage.controlsManager.setRootRotation(axis, val);
-      } else if (selectedPart && selectedPart !== 'root') {
-        stage.controlsManager.setPartRotation(selectedPart, axis, val);
-      }
-    }
-  };
+  const handlePosChange = (axis: 'x' | 'y' | 'z', valStr: string) => handleTransformAxisChange('pos', axis, valStr);
+  const handleRotChange = (axis: 'x' | 'y' | 'z', valStr: string) => handleTransformAxisChange('rot', axis, valStr);
 
   return (
     <>
@@ -176,17 +168,13 @@ export function LeftSidebar({
         onChange={handleFileUpload}
       />
 
-      {/* Left Sidebar (#360403, border-0, shadow-none, scrollable for high zoom) */}
       <aside
         className={`absolute left-0 top-0 bottom-0 z-40 w-[214px] bg-[#360403] transition-transform duration-350 ease-spring flex flex-col justify-between select-none font-['Rethink_Sans'] border-0 shadow-none overflow-y-auto custom-deck-scrollbar ${
           isCollapsed ? '-translate-x-full' : 'translate-x-0'
         }`}
       >
-        {/* Top Section */}
         <div className="flex flex-col">
-          {/* Top Mode Header Strip with Sliding Pill Indicator */}
           <div className="relative w-full h-[26px] bg-[#730907] p-[3px] flex items-center">
-            {/* Sliding Pill Indicator */}
             <div
               className="absolute top-[3px] bottom-[3px] rounded-full bg-[#AE0D0A] transition-transform duration-300 ease-spring pointer-events-none"
               style={{
@@ -198,7 +186,6 @@ export function LeftSidebar({
               }}
             />
 
-            {/* Segmented Buttons */}
             <button
               type="button"
               onClick={() => handleTabChange('BODY')}
@@ -228,7 +215,6 @@ export function LeftSidebar({
             </button>
           </div>
 
-          {/* Decomposed Transform Card or World Cards (Camera & Lighting) */}
           {activeTab === 'WORLD' ? (
             <div className="flex flex-col gap-2">
               <CameraCard stage={stage} />
@@ -252,9 +238,7 @@ export function LeftSidebar({
           )}
         </div>
 
-        {/* Bottom Cluster: Settings Button + Action Toolbar */}
         <div className="w-full flex flex-col gap-1.5 pb-2.5">
-          {/* Settings Full-Width Trigger */}
           <div className="w-full px-2.5 box-border">
             <button
               ref={settingsBtnRef}
@@ -273,9 +257,7 @@ export function LeftSidebar({
             </button>
           </div>
 
-          {/* Bottom Bar: Import Skin & Export Button (NO borders, NO inner shadow) */}
           <div className="w-full px-2.5 flex items-center gap-2 overflow-hidden box-border">
-            {/* Skin Uploader Pill */}
             {!skinName ? (
               <button
                 type="button"
@@ -297,7 +279,6 @@ export function LeftSidebar({
               </div>
             )}
 
-            {/* Export Red Pill Button */}
             <button
               type="button"
               onClick={onOpenExport}
@@ -309,7 +290,6 @@ export function LeftSidebar({
         </div>
       </aside>
 
-      {/* Collapse Toggle Tab (Left edge docked when collapsed, border-0, shadow-none) */}
       <button
         type="button"
         onClick={onToggleCollapse}

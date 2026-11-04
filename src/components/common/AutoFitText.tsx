@@ -33,6 +33,7 @@ export const AutoFitText: React.FC<AutoFitTextProps> = ({
       // Use getBoundingClientRect divided by current scale to get true natural unscaled width
       const naturalTextWidth = scale !== 0 ? text.getBoundingClientRect().width / scale : text.scrollWidth;
 
+      // EDGE CASE: naturalTextWidth being NaN bypasses <= 0 check (NaN <= 0 is false), setting scale to NaN and breaking transform
       if (containerWidth <= 0 || naturalTextWidth <= 0) return;
 
       const availableWidth = Math.max(0, containerWidth - horizontalPadding);

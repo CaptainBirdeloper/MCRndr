@@ -41,7 +41,6 @@ export function createMinecraftRig(initialTexture: THREE.CanvasTexture, initialA
   const root = new THREE.Group();
   root.position.set(0, 0, 0);
 
-  // Helper to construct a dual-layer box part
   function buildLimb(
     partName: BodyPartName,
     w: number,
@@ -56,7 +55,6 @@ export function createMinecraftRig(initialTexture: THREE.CanvasTexture, initialA
     pivot.name = `pivot_${partName}`;
     pivot.userData = { partName, isPivot: true };
 
-    // Base inner mesh
     const innerGeo = new THREE.BoxGeometry(w, h, d);
     setMinecraftBoxUV(innerGeo, baseUV);
     const innerMesh = new THREE.Mesh(innerGeo, baseMat);
@@ -155,7 +153,7 @@ export function createMinecraftRig(initialTexture: THREE.CanvasTexture, initialA
   leftLegLimb.group.position.set(2 / 16, 0, 0);
   pelvis.add(leftLegLimb.group);
 
-  // Joints dictionary
+  // EDGE CASE: grp.children[0] and grp.children[1] may be undefined or non-Mesh if root or pelvis children are modified elsewhere
   const dummyJoint = (name: BodyPartName, grp: THREE.Group): RigJoint => ({
     group: grp,
     innerMesh: grp.children[0] as THREE.Mesh,
@@ -185,30 +183,30 @@ export function createMinecraftRig(initialTexture: THREE.CanvasTexture, initialA
 
   function setArmType(type: ArmType) {
     currentArmType = type;
+    // EDGE CASE: repeated setArmType calls rapidly dispose and reallocate BoxGeometries without pooling, causing brief GC pauses
     const newArmW = type === 'alex' ? 3 / 16 : 4 / 16;
     const offset = type === 'alex' ? 0.015 : 0;
 
-    // Update Right Arm
-    rightArmLimb.innerMesh.geometry.dispose();
-    rightArmLimb.innerMesh.geometry = new THREE.BoxGeometry(newArmW, 12 / 16, 4 / 16);
-    setMinecraftBoxUV(rightArmLimb.innerMesh.geometry as THREE.BoxGeometry, uv.rightArmBase);
+    const updateArm = (
+      limb: RigJoint,
+      baseUV: SkinBoxUV,
+      outerUV: SkinBoxUV,
+      isLeft: boolean
+    ) => {
+      limb.innerMesh.geometry.dispose();
+      limb.innerMesh.geometry = new THREE.BoxGeometry(newArmW, 12 / 16, 4 / 16);
+      setMinecraftBoxUV(limb.innerMesh.geometry as THREE.BoxGeometry, baseUV);
 
-    rightArmLimb.outerMesh.geometry.dispose();
-    rightArmLimb.outerMesh.geometry = new THREE.BoxGeometry(newArmW + 0.035, 12 / 16 + 0.035, 4 / 16 + 0.035);
-    setMinecraftBoxUV(rightArmLimb.outerMesh.geometry as THREE.BoxGeometry, uv.rightArmOuter);
+      limb.outerMesh.geometry.dispose();
+      limb.outerMesh.geometry = new THREE.BoxGeometry(newArmW + 0.035, 12 / 16 + 0.035, 4 / 16 + 0.035);
+      setMinecraftBoxUV(limb.outerMesh.geometry as THREE.BoxGeometry, outerUV);
 
-    rightArmLimb.group.position.set(-(4 / 16 + newArmW / 2) + offset, 10 / 16, 0);
+      const posX = isLeft ? 4 / 16 + newArmW / 2 - offset : -(4 / 16 + newArmW / 2) + offset;
+      limb.group.position.set(posX, 10 / 16, 0);
+    };
 
-    // Update Left Arm
-    leftArmLimb.innerMesh.geometry.dispose();
-    leftArmLimb.innerMesh.geometry = new THREE.BoxGeometry(newArmW, 12 / 16, 4 / 16);
-    setMinecraftBoxUV(leftArmLimb.innerMesh.geometry as THREE.BoxGeometry, uv.leftArmBase);
-
-    leftArmLimb.outerMesh.geometry.dispose();
-    leftArmLimb.outerMesh.geometry = new THREE.BoxGeometry(newArmW + 0.035, 12 / 16 + 0.035, 4 / 16 + 0.035);
-    setMinecraftBoxUV(leftArmLimb.outerMesh.geometry as THREE.BoxGeometry, uv.leftArmOuter);
-
-    leftArmLimb.group.position.set(4 / 16 + newArmW / 2 - offset, 10 / 16, 0);
+    updateArm(rightArmLimb, uv.rightArmBase, uv.rightArmOuter, false);
+    updateArm(leftArmLimb, uv.leftArmBase, uv.leftArmOuter, true);
   }
 
   function resetPose() {

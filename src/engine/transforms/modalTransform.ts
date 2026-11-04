@@ -74,15 +74,12 @@ export function createModalTransformEngine(
     return rig.joints[part] || null;
   }
 
-  function startModal(mode: 'translate' | 'rotate', selectedPart: BodyPartName | 'root' | null) {
-    const target = getTarget(selectedPart);
-    if (!target) return;
-
+  function initModal(mode: 'translate' | 'rotate', targetObject: THREE.Object3D, customTarget?: THREE.Object3D) {
     // Joint point is always the anatomical pivot
     const pivotWorld = new THREE.Vector3();
-    target.group.getWorldPosition(pivotWorld);
+    targetObject.getWorldPosition(pivotWorld);
 
-    // Project joint pivot to screen coordinates
+    // EDGE CASE: rect.width or rect.height of 0 (e.g. unmounted canvas) produces NaN screen pivot coordinates
     const proj = pivotWorld.clone().project(camera);
     const rect = domElement.getBoundingClientRect();
     const pivotScreen = new THREE.Vector2(
@@ -95,41 +92,25 @@ export function createModalTransformEngine(
       axis: null,
       startClientX: lastPointerPos.x,
       startClientY: lastPointerPos.y,
-      startPos: target.group.position.clone(),
-      startQuat: target.group.quaternion.clone(),
+      startPos: targetObject.position.clone(),
+      startQuat: targetObject.quaternion.clone(),
       pivotWorld,
       pivotScreen,
+      customTarget,
     };
 
     orbitControls.enabled = false;
     gizmo.getHelper().visible = true;
   }
 
+  function startModal(mode: 'translate' | 'rotate', selectedPart: BodyPartName | 'root' | null) {
+    const target = getTarget(selectedPart);
+    if (!target) return;
+    initModal(mode, target.group);
+  }
+
   function startModalObject(mode: 'translate' | 'rotate', object: THREE.Object3D) {
-    const pivotWorld = new THREE.Vector3();
-    object.getWorldPosition(pivotWorld);
-
-    const proj = pivotWorld.clone().project(camera);
-    const rect = domElement.getBoundingClientRect();
-    const pivotScreen = new THREE.Vector2(
-      ((proj.x + 1) * rect.width) / 2 + rect.left,
-      ((-proj.y + 1) * rect.height) / 2 + rect.top
-    );
-
-    modal = {
-      mode,
-      axis: null,
-      startClientX: lastPointerPos.x,
-      startClientY: lastPointerPos.y,
-      startPos: object.position.clone(),
-      startQuat: object.quaternion.clone(),
-      pivotWorld,
-      pivotScreen,
-      customTarget: object,
-    };
-
-    orbitControls.enabled = false;
-    gizmo.getHelper().visible = true;
+    initModal(mode, object, object);
   }
 
   function finishModal(selectedPart: BodyPartName | 'root' | null) {
@@ -145,7 +126,7 @@ export function createModalTransformEngine(
       return;
     }
     const target = getTarget(selectedPart);
-    if (target && selectedPart) {
+    if (target) {
       const endPos = target.group.position.clone();
       const endQuat = target.group.quaternion.clone();
       if (!endPos.equals(modal.startPos) || !endQuat.equals(modal.startQuat)) {
@@ -209,11 +190,9 @@ export function createModalTransformEngine(
       const camUp = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
 
       if (modal.axis === null) {
-        // Free move without axis restriction (camera plane)
         const moveDelta = camRight.clone().multiplyScalar(dx * sens).add(camUp.clone().multiplyScalar(-dy * sens));
         target.group.position.copy(modal.startPos).add(moveDelta);
       } else {
-        // Constrained axis move
         const axisVector = new THREE.Vector3(
           modal.axis === 'x' ? 1 : 0,
           modal.axis === 'y' ? 1 : 0,
@@ -224,7 +203,6 @@ export function createModalTransformEngine(
       }
     } else if (modal.mode === 'rotate') {
       if (modal.axis === null) {
-        // Natural joint-anchored rotation following mouse drag direction
         const dragDist = Math.hypot(dx, dy);
         if (dragDist > 1) {
           const camRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
@@ -232,6 +210,7 @@ export function createModalTransformEngine(
           const dragVector = camRight.clone().multiplyScalar(dx).add(camUp.clone().multiplyScalar(-dy));
           const camForward = camera.getWorldDirection(new THREE.Vector3());
           // Axis perpendicular to drag direction in view plane (drag up -> rotates limb upward)
+          // EDGE CASE: dragVector colinear with camForward produces zero-length cross product vector, causing normalize() to return Vector3(0,0,0) and rotation to fail
           const rotAxis = new THREE.Vector3().crossVectors(dragVector, camForward).normalize();
           const angle = dragDist * 0.012;
           const deltaQuat = new THREE.Quaternion().setFromAxisAngle(rotAxis, angle);
@@ -240,7 +219,6 @@ export function createModalTransformEngine(
           target.group.quaternion.copy(modal.startQuat);
         }
       } else {
-        // Constrained single-axis rotation around anatomical joint pivot (corrected direction)
         const angle = (dy - dx) * 0.012;
         const localAxis = new THREE.Vector3(
           modal.axis === 'x' ? 1 : 0,
@@ -274,7 +252,7 @@ export function createModalTransformEngine(
     fallbackMode: 'translate' | 'rotate' = 'translate'
   ) {
     if (!selectedPart && !modal?.customTarget) return;
-    if (!modal && selectedPart) {
+    if (!modal) {
       startModal(fallbackMode, selectedPart);
     }
     if (!modal) return;
@@ -282,7 +260,6 @@ export function createModalTransformEngine(
     if (!target) return;
 
     if (modal.axis === axis) {
-      // Toggle off restriction
       modal.axis = null;
       axisLine.visible = false;
       gizmo.showX = true;
@@ -300,7 +277,6 @@ export function createModalTransformEngine(
     modal.startPos.copy(target.group.position);
     modal.startQuat.copy(target.group.quaternion);
 
-    // Position & align 3D axis guideline at joint socket
     const worldPos = new THREE.Vector3();
     target.group.getWorldPosition(worldPos);
     axisLine.position.copy(worldPos);
@@ -309,15 +285,15 @@ export function createModalTransformEngine(
     target.group.getWorldQuaternion(worldQuat);
 
     if (axis === 'x') {
-      axisMat.color.setHex(0xef4444); // Red
+      axisMat.color.setHex(0xef4444);
       axisLine.quaternion.copy(worldQuat);
     } else if (axis === 'y') {
-      axisMat.color.setHex(0x22c55e); // Green
+      axisMat.color.setHex(0x22c55e);
       axisLine.quaternion.copy(worldQuat).multiply(
         new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2)
       );
     } else {
-      axisMat.color.setHex(0x3b82f6); // Blue
+      axisMat.color.setHex(0x3b82f6);
       axisLine.quaternion.copy(worldQuat).multiply(
         new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI / 2)
       );

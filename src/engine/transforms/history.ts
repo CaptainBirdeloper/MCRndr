@@ -82,24 +82,27 @@ export function createHistoryManager(
     }
   }
 
-  function commitPositionHistory(axis: 'x' | 'y' | 'z', prev: number, next: number) {
+  function commitAxisHistory(
+    type: 'root_pos_axis' | 'root_rot_axis',
+    axis: 'x' | 'y' | 'z',
+    prev: number,
+    next: number
+  ) {
     if (prev === next) return;
     pushAction({
-      type: 'root_pos_axis',
+      type,
       axis,
       prev,
       next,
     });
   }
 
+  function commitPositionHistory(axis: 'x' | 'y' | 'z', prev: number, next: number) {
+    commitAxisHistory('root_pos_axis', axis, prev, next);
+  }
+
   function commitRotationHistory(axis: 'x' | 'y' | 'z', prev: number, next: number) {
-    if (prev === next) return;
-    pushAction({
-      type: 'root_rot_axis',
-      axis,
-      prev,
-      next,
-    });
+    commitAxisHistory('root_rot_axis', axis, prev, next);
   }
 
   function commitPartPositionHistory(part: BodyPartName, axis: 'x' | 'y' | 'z', prev: number, next: number) {
@@ -122,38 +125,38 @@ export function createHistoryManager(
     });
   }
 
-  function undo() {
-    const action = undoStack.pop();
-    if (!action) return;
-    onUndoCb?.();
-
+  function applyHistoryAction(action: HistoryAction, direction: 'prev' | 'next') {
     if (action.type === 'root_pos_axis') {
-      rig.root.position[action.axis] = action.prev / 100;
+      const val = direction === 'prev' ? action.prev : action.next;
+      rig.root.position[action.axis] = val / 100;
       boxHelper.setFromObject(rig.root);
       callbacks.notifyRootTransform();
     } else if (action.type === 'root_rot_axis') {
-      rig.root.rotation[action.axis] = (action.prev * Math.PI) / 180;
+      const val = direction === 'prev' ? action.prev : action.next;
+      rig.root.rotation[action.axis] = (val * Math.PI) / 180;
       boxHelper.setFromObject(rig.root);
       callbacks.notifyRootTransform();
     } else if (action.type === 'part_pos_axis') {
       const joint = rig.joints[action.part];
       if (joint) {
-        joint.group.position[action.axis] = action.prev / 100;
+        const val = direction === 'prev' ? action.prev : action.next;
+        joint.group.position[action.axis] = val / 100;
         boxHelper.setFromObject(joint.group);
         callbacks.notifyPartTransform(action.part);
       }
     } else if (action.type === 'part_rot_axis') {
       const joint = rig.joints[action.part];
       if (joint) {
-        joint.group.rotation[action.axis] = (action.prev * Math.PI) / 180;
+        const val = direction === 'prev' ? action.prev : action.next;
+        joint.group.rotation[action.axis] = (val * Math.PI) / 180;
         boxHelper.setFromObject(joint.group);
         callbacks.notifyPartTransform(action.part);
       }
     } else if (action.type === 'modal_transform') {
       const joint = rig.joints[action.part];
       if (joint) {
-        joint.group.position.copy(action.prevPos);
-        joint.group.quaternion.copy(action.prevQuat);
+        joint.group.position.copy(direction === 'prev' ? action.prevPos : action.nextPos);
+        joint.group.quaternion.copy(direction === 'prev' ? action.prevQuat : action.nextQuat);
         boxHelper.setFromObject(joint.group);
         if (action.part === 'root') {
           callbacks.notifyRootTransform();
@@ -162,72 +165,36 @@ export function createHistoryManager(
         }
       }
     } else if (action.type === 'pose') {
-      Object.entries(action.prevRotations).forEach(([name, targetEulerArr]) => {
+      const rotations = direction === 'prev' ? action.prevRotations : action.nextRotations;
+      const rootPos = direction === 'prev' ? action.prevRootPos : action.nextRootPos;
+      Object.entries(rotations).forEach(([name, targetEulerArr]) => {
         const part = name as BodyPartName;
         const joint = rig.joints[part];
         if (joint && targetEulerArr) {
+          // EDGE CASE: targetEulerArr may not have 3 elements, causing NaN rotation angles
           joint.group.rotation.set(targetEulerArr[0], targetEulerArr[1], targetEulerArr[2]);
         }
       });
-      rig.root.position.set(...action.prevRootPos);
+      // EDGE CASE: prevRootPos spread can pass unexpected array length to Vector3.set
+      // EDGE CASE: nextRootPos spread can pass unexpected array length to Vector3.set
+      rig.root.position.set(...rootPos);
       boxHelper.setFromObject(rig.root);
       callbacks.notifyRootTransform();
     }
+  }
 
+  function undo() {
+    const action = undoStack.pop();
+    if (!action) return;
+    onUndoCb?.();
+    applyHistoryAction(action, 'prev');
     redoStack.push(action);
   }
 
   function redo() {
     const action = redoStack.pop();
     if (!action) return;
-
-    if (action.type === 'root_pos_axis') {
-      rig.root.position[action.axis] = action.next / 100;
-      boxHelper.setFromObject(rig.root);
-      callbacks.notifyRootTransform();
-    } else if (action.type === 'root_rot_axis') {
-      rig.root.rotation[action.axis] = (action.next * Math.PI) / 180;
-      boxHelper.setFromObject(rig.root);
-      callbacks.notifyRootTransform();
-    } else if (action.type === 'part_pos_axis') {
-      const joint = rig.joints[action.part];
-      if (joint) {
-        joint.group.position[action.axis] = action.next / 100;
-        boxHelper.setFromObject(joint.group);
-        callbacks.notifyPartTransform(action.part);
-      }
-    } else if (action.type === 'part_rot_axis') {
-      const joint = rig.joints[action.part];
-      if (joint) {
-        joint.group.rotation[action.axis] = (action.next * Math.PI) / 180;
-        boxHelper.setFromObject(joint.group);
-        callbacks.notifyPartTransform(action.part);
-      }
-    } else if (action.type === 'modal_transform') {
-      const joint = rig.joints[action.part];
-      if (joint) {
-        joint.group.position.copy(action.nextPos);
-        joint.group.quaternion.copy(action.nextQuat);
-        boxHelper.setFromObject(joint.group);
-        if (action.part === 'root') {
-          callbacks.notifyRootTransform();
-        } else {
-          callbacks.notifyAngleChange(action.part);
-        }
-      }
-    } else if (action.type === 'pose') {
-      Object.entries(action.nextRotations).forEach(([name, targetEulerArr]) => {
-        const part = name as BodyPartName;
-        const joint = rig.joints[part];
-        if (joint && targetEulerArr) {
-          joint.group.rotation.set(targetEulerArr[0], targetEulerArr[1], targetEulerArr[2]);
-        }
-      });
-      rig.root.position.set(...action.nextRootPos);
-      boxHelper.setFromObject(rig.root);
-      callbacks.notifyRootTransform();
-    }
-
+    applyHistoryAction(action, 'next');
     undoStack.push(action);
   }
 

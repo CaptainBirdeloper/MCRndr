@@ -30,9 +30,7 @@ export function LightingCard({ stage }: LightingCardProps) {
 
   return (
     <div className="w-full flex flex-col gap-2 font-['Rethink_Sans'] select-none">
-      {/* Card Container */}
       <div className="mx-auto w-[calc(100%-16px)] bg-[#730907]/40 rounded-[14px] p-2 flex flex-col gap-2">
-        {/* Header */}
         <div className="w-full flex items-center justify-between px-1">
           <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#F5F5F5] uppercase tracking-wider">
             <Sun className="w-3.5 h-3.5 text-[#AE0D0A]" />
@@ -40,7 +38,6 @@ export function LightingCard({ stage }: LightingCardProps) {
           </div>
         </div>
 
-        {/* Style Switcher Pill */}
         <div className="w-full h-[22px] bg-[#07050F] p-[2px] rounded-full flex items-center">
           <button
             type="button"
@@ -62,7 +59,6 @@ export function LightingCard({ stage }: LightingCardProps) {
           </button>
         </div>
 
-        {/* Lights List */}
         <div className="flex flex-col gap-1 max-h-[120px] overflow-y-auto custom-deck-scrollbar">
           {lights.map((l) => (
             <div
@@ -89,13 +85,14 @@ export function LightingCard({ stage }: LightingCardProps) {
           ))}
         </div>
 
-        {/* Active Light Intensity */}
         {activeLight && (
           <div className="flex flex-col gap-1 pt-1 border-t border-[#730907]/40">
             <div className="flex items-center justify-between text-[8.5px] font-bold text-[#F5F5F5]/60">
               <span>{activeLight.name.toUpperCase()} INTENSITY</span>
+              {/* EDGE CASE: activeLight.intensity being undefined or null will throw TypeError on .toFixed() */}
               <span className="text-[#AE0D0A]">{activeLight.intensity.toFixed(1)}</span>
             </div>
+            {/* EDGE CASE: parseFloat evaluating to NaN passes invalid intensity into lightingManager */}
             <input
               type="range"
               min="0"

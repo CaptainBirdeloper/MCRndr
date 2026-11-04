@@ -28,7 +28,6 @@
 .ease-smooth { transition-timing-function: var(--ease-smooth); }
 .ease-bounce { transition-timing-function: var(--ease-bounce); }
 
-/* Spring Jump Activation Keyframes for unified bar */
 @keyframes barSpringJump {
   0% {
     transform: translateY(28px) scale(0.92);
@@ -67,7 +66,6 @@
   }
 }
 
-/* Custom Scrollbar styled for Lunacy Preset Deck */
 .custom-deck-scrollbar::-webkit-scrollbar {
   width: 5px;
 }

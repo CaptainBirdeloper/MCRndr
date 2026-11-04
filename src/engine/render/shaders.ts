@@ -14,7 +14,6 @@ export const CLOWN_PASS_COLORS: Record<BodyPartName, number> = {
   leftLeg: 0x00ffff,
 };
 
-// Camera-Space Normal Shader with Alpha-Test for 2nd skin layer
 const NormalShader = {
   vertexShader: `
     varying vec3 vNormal;
@@ -39,7 +38,6 @@ const NormalShader = {
   `,
 };
 
-// WEM (White Entities Mask) Shader with Alpha-Test
 const WEMShader = {
   vertexShader: `
     varying vec2 vUv;
@@ -59,7 +57,6 @@ const WEMShader = {
   `,
 };
 
-// Clown/Material ID Shader with Alpha-Test
 const ClownShader = {
   vertexShader: `
     varying vec2 vUv;
@@ -85,7 +82,6 @@ export class ShaderPassManager {
   private currentMode: ShaderPassMode = 'beauty';
   private texture: THREE.CanvasTexture;
 
-  // Cached materials
   private wemMaterial: THREE.ShaderMaterial;
   private normalMaterial: THREE.ShaderMaterial;
   private clownMaterials: Map<BodyPartName, THREE.ShaderMaterial> = new Map();
@@ -108,8 +104,8 @@ export class ShaderPassManager {
       side: THREE.DoubleSide,
     });
 
-    // Initialize clown materials
     (Object.keys(CLOWN_PASS_COLORS) as BodyPartName[]).forEach((part) => {
+      // EDGE CASE: unmapped body part in CLOWN_PASS_COLORS defaults color to white, causing limb color collision in clown pass
       const col = new THREE.Color(CLOWN_PASS_COLORS[part]);
       const mat = new THREE.ShaderMaterial({
         uniforms: {
@@ -137,6 +133,7 @@ export class ShaderPassManager {
     this.currentMode = mode;
 
     Object.values(this.rig.joints).forEach((joint) => {
+      // EDGE CASE: pelvis joint innerMesh/outerMesh are Group instances without material property; assigning material has no effect on child meshes
       if (!joint.innerMesh || !joint.outerMesh) return;
 
       if (mode === 'beauty') {
@@ -149,7 +146,7 @@ export class ShaderPassManager {
         joint.innerMesh.material = this.normalMaterial;
         joint.outerMesh.material = this.normalMaterial;
       } else if (mode === 'clown') {
-        const mat = this.clownMaterials.get(joint.partName) || this.wemMaterial;
+        const mat = this.clownMaterials.get(joint.partName)!;
         joint.innerMesh.material = mat;
         joint.outerMesh.material = mat;
       }

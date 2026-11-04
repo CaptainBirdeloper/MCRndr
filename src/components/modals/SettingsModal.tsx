@@ -17,13 +17,13 @@ export function SettingsModal({ isOpen, onClose, origin, stage, onSettingsChange
   const [isAnimated, setIsAnimated] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
 
-  // Apply settings to stage (pure 3D stage controls)
   const applySettingsToStage = (newSettings: UserSettings) => {
     if (!stage) return;
     stage.controlsManager.setPerpetualFov(newSettings.perpetualFov);
     stage.controls.rotateSpeed = newSettings.orbitSensitivity;
     stage.controls.zoomSpeed = newSettings.orbitSensitivity;
     stage.grid.visible = newSettings.showGrid;
+    // EDGE CASE: helper array containing null or undefined elements will throw TypeError on h.visible
     stage.controlsManager.getCameraHelpers().forEach((h) => {
       h.visible = newSettings.showCameraGlyphs;
     });
@@ -35,7 +35,6 @@ export function SettingsModal({ isOpen, onClose, origin, stage, onSettingsChange
     }
   }, [stage]);
 
-  // Handle open/close animation lifecycle
   useEffect(() => {
     if (isOpen) {
       setIsRendered(true);
@@ -66,7 +65,6 @@ export function SettingsModal({ isOpen, onClose, origin, stage, onSettingsChange
     }
   }, [isOpen, isRendered]);
 
-  // Escape key listener
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -101,6 +99,35 @@ export function SettingsModal({ isOpen, onClose, origin, stage, onSettingsChange
     }, 280);
   };
 
+  const renderToggle = (
+    label: string,
+    icon: React.ReactNode,
+    key: 'showGrid' | 'showCameraGlyphs'
+  ) => {
+    const isChecked = settings[key];
+    return (
+      <div className="flex items-center justify-between px-1">
+        <div className="flex items-center gap-1.5 text-[#F5F5F5]/80 text-[10px] font-bold">
+          {icon}
+          <span>{label}</span>
+        </div>
+        <button
+          type="button"
+          onClick={() => updateSetting(key, !isChecked)}
+          className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-250 cursor-pointer flex items-center border-0 shadow-none ${
+            isChecked ? 'bg-[#AE0D0A]' : 'bg-[#360403]'
+          }`}
+        >
+          <div
+            className={`w-4 h-4 rounded-full bg-white transition-transform duration-250 ease-spring ${
+              isChecked ? 'translate-x-4' : 'translate-x-0'
+            }`}
+          />
+        </button>
+      </div>
+    );
+  };
+
   if (!isRendered) return null;
 
   // Calculate dynamic delta from button center to viewport center
@@ -109,7 +136,6 @@ export function SettingsModal({ isOpen, onClose, origin, stage, onSettingsChange
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center select-none font-['Rethink_Sans']">
-      {/* Backdrop */}
       <div
         onClick={handleClose}
         className={`absolute inset-0 bg-black/60 backdrop-blur-xs transition-opacity duration-280 ${
@@ -117,7 +143,6 @@ export function SettingsModal({ isOpen, onClose, origin, stage, onSettingsChange
         }`}
       />
 
-      {/* Modal Dialog Card with Origin-Popout Spring */}
       <div
         ref={modalRef}
         style={{
@@ -129,7 +154,6 @@ export function SettingsModal({ isOpen, onClose, origin, stage, onSettingsChange
         }}
         className="relative z-10 w-[340px] bg-[#07050F] rounded-[16px] border border-[#730907]/60 shadow-2xl overflow-hidden flex flex-col"
       >
-        {/* Header Banner */}
         <div className="w-full h-[32px] bg-[#730907] flex items-center justify-between px-3 border-0 shadow-none">
           <div className="flex items-center gap-1.5 text-[11px] font-bold text-[#F5F5F5] uppercase tracking-wider">
             <Sliders className="w-3.5 h-3.5 text-[#AE0D0A]" />
@@ -144,9 +168,7 @@ export function SettingsModal({ isOpen, onClose, origin, stage, onSettingsChange
           </button>
         </div>
 
-        {/* Settings Body */}
         <div className="p-3.5 flex flex-col gap-3.5 max-h-[80vh] overflow-y-auto custom-deck-scrollbar">
-          {/* SECTION 1: UI ZOOM SLIDER (50% TO 300%) */}
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between px-0.5">
               <span className="text-[9.5px] font-bold text-[#F5F5F5]/60 uppercase tracking-wider flex items-center gap-1">
@@ -159,6 +181,7 @@ export function SettingsModal({ isOpen, onClose, origin, stage, onSettingsChange
             </div>
 
             <div className="w-full bg-[#360403] rounded-[12px] p-2.5 flex items-center">
+              {/* EDGE CASE: invalid or non-numeric input converts to NaN, persisting corrupted uiZoom to localStorage */}
               <input
                 type="range"
                 min="50"
@@ -171,7 +194,6 @@ export function SettingsModal({ isOpen, onClose, origin, stage, onSettingsChange
             </div>
           </div>
 
-          {/* SECTION 2: PERPETUAL FOV */}
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between px-0.5">
               <span className="text-[9.5px] font-bold text-[#F5F5F5]/60 uppercase tracking-wider">
@@ -216,12 +238,12 @@ export function SettingsModal({ isOpen, onClose, origin, stage, onSettingsChange
             </div>
           </div>
 
-          {/* SECTION 3: ORBIT SENSITIVITY */}
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between px-0.5">
               <span className="text-[9.5px] font-bold text-[#F5F5F5]/60 uppercase tracking-wider">
                 Orbit & Zoom Sensitivity
               </span>
+              {/* EDGE CASE: orbitSensitivity being NaN or undefined will throw TypeError on .toFixed() or display NaN */}
               <span className="text-[11px] font-bold text-[#AE0D0A]">
                 {settings.orbitSensitivity.toFixed(1)}x
               </span>
@@ -240,52 +262,11 @@ export function SettingsModal({ isOpen, onClose, origin, stage, onSettingsChange
             </div>
           </div>
 
-          {/* SECTION 4: STAGE OVERLAYS (IOS-STYLE TOGGLES) */}
           <div className="flex flex-col gap-2 pt-1 border-t border-[#730907]/40">
-            {/* Ground Grid Toggle */}
-            <div className="flex items-center justify-between px-1">
-              <div className="flex items-center gap-1.5 text-[#F5F5F5]/80 text-[10px] font-bold">
-                <Grid className="w-3.5 h-3.5 text-[#AE0D0A]" />
-                <span>Ground Studio Grid</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => updateSetting('showGrid', !settings.showGrid)}
-                className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-250 cursor-pointer flex items-center border-0 shadow-none ${
-                  settings.showGrid ? 'bg-[#AE0D0A]' : 'bg-[#360403]'
-                }`}
-              >
-                <div
-                  className={`w-4 h-4 rounded-full bg-white transition-transform duration-250 ease-spring ${
-                    settings.showGrid ? 'translate-x-4' : 'translate-x-0'
-                  }`}
-                />
-              </button>
-            </div>
-
-            {/* Camera Wireframe Glyphs Toggle */}
-            <div className="flex items-center justify-between px-1">
-              <div className="flex items-center gap-1.5 text-[#F5F5F5]/80 text-[10px] font-bold">
-                <Camera className="w-3.5 h-3.5 text-[#AE0D0A]" />
-                <span>Camera Wireframe Models</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => updateSetting('showCameraGlyphs', !settings.showCameraGlyphs)}
-                className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-250 cursor-pointer flex items-center border-0 shadow-none ${
-                  settings.showCameraGlyphs ? 'bg-[#AE0D0A]' : 'bg-[#360403]'
-                }`}
-              >
-                <div
-                  className={`w-4 h-4 rounded-full bg-white transition-transform duration-250 ease-spring ${
-                    settings.showCameraGlyphs ? 'translate-x-4' : 'translate-x-0'
-                  }`}
-                />
-              </button>
-            </div>
+            {renderToggle('Ground Studio Grid', <Grid className="w-3.5 h-3.5 text-[#AE0D0A]" />, 'showGrid')}
+            {renderToggle('Camera Wireframe Models', <Camera className="w-3.5 h-3.5 text-[#AE0D0A]" />, 'showCameraGlyphs')}
           </div>
 
-          {/* RESET DEFAULTS */}
           <div className="pt-2 border-t border-[#730907]/40 flex justify-center">
             <button
               type="button"

@@ -57,6 +57,7 @@ export function createLightingManager(
         if ((child as THREE.Line).isLine || (child as THREE.LineSegments).isLineSegments) {
           const mat = (child as THREE.Line).material as THREE.LineBasicMaterial;
           if (mat) {
+            // EDGE CASE: l.color being undefined or null will throw TypeError on .replace()
             mat.color.setHex(isSelected ? 0xae0d0a : parseInt(l.color.replace('#', '0x'), 16) || 0xfff3e0);
             mat.needsUpdate = true;
           }
@@ -65,19 +66,22 @@ export function createLightingManager(
     });
   }
 
+  function getLights(): LightItem[] {
+    return lights.map((l) => ({
+      id: l.id,
+      name: l.name,
+      type: l.type,
+      visible: l.visible,
+      intensity: l.intensity,
+      color: l.color,
+      castShadow: l.castShadow,
+    }));
+  }
+
   function notifyChange() {
     updateGlyphHighlights();
     if (onChangeCb) {
-      const items: LightItem[] = lights.map((l) => ({
-        id: l.id,
-        name: l.name,
-        type: l.type,
-        visible: l.visible,
-        intensity: l.intensity,
-        color: l.color,
-        castShadow: l.castShadow,
-      }));
-      onChangeCb(items, activeLightId);
+      onChangeCb(getLights(), activeLightId);
     }
   }
 
@@ -117,7 +121,6 @@ export function createLightingManager(
 
     group.add(light);
     const glyph = createLightGlyph(type, colorHex);
-    // Mark hit mesh with lightId
     glyph.traverse((child) => {
       if (child.userData.isLight) {
         child.userData.lightId = id;
@@ -141,12 +144,10 @@ export function createLightingManager(
     lights.push(managed);
   }
 
-  // Initial Studio 3-Point Lights
   addInitialLight('Key Light', 'directional', 0xfff3e0, 2.2, [3, 4, 3], true);
   addInitialLight('Fill Light', 'directional', 0xcfd8dc, 0.9, [-3, 2, 2], false);
   addInitialLight('Rim Light', 'directional', 0x80d8ff, 2.6, [0, 3.5, -3.5], false);
 
-  // Studio Ambient
   const ambient = new THREE.AmbientLight(0xffffff, 0.45);
   scene.add(ambient);
 
@@ -168,7 +169,6 @@ export function createLightingManager(
     const worldPos = new THREE.Vector3();
     l.group.getWorldPosition(worldPos);
 
-    // Behind camera check
     const camDir = new THREE.Vector3();
     camera.getWorldDirection(camDir);
     const toLight = worldPos.clone().sub(camera.position);
@@ -184,6 +184,7 @@ export function createLightingManager(
     const rawX = ((proj.x + 1) * width) / 2;
     const rawY = ((-proj.y + 1) * height) / 2;
 
+    // EDGE CASE: viewport width < 438 or height < 220 inverts clamp bounds, pinning modal position off-screen
     const clampedX = Math.max(228, Math.min(width - 210, rawX + 32));
     const clampedY = Math.max(40, Math.min(height - 180, rawY - 24));
 
@@ -254,16 +255,7 @@ export function createLightingManager(
   }
 
   return {
-    getLights: () =>
-      lights.map((l) => ({
-        id: l.id,
-        name: l.name,
-        type: l.type,
-        visible: l.visible,
-        intensity: l.intensity,
-        color: l.color,
-        castShadow: l.castShadow,
-      })),
+    getLights,
     getActiveLightId: () => activeLightId,
     selectLight,
     setLightIntensity,

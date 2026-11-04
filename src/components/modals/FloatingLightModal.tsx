@@ -43,10 +43,10 @@ export function FloatingLightModal({
         </button>
       </div>
 
-      {/* Intensity Slider */}
       <div className="flex flex-col gap-1">
         <div className="flex items-center justify-between text-[9px] font-bold text-[#F5F5F5]/60">
           <span>INTENSITY</span>
+          {/* EDGE CASE: light.intensity being undefined or null will throw TypeError on .toFixed() */}
           <span className="text-[#AE0D0A]">{light.intensity.toFixed(1)}</span>
         </div>
         <input
@@ -60,7 +60,6 @@ export function FloatingLightModal({
         />
       </div>
 
-      {/* Quick Color Swatches */}
       {onColorChange && (
         <div className="flex items-center justify-between pt-1 border-t border-[#730907]/30">
           <span className="text-[8.5px] font-bold text-[#F5F5F5]/60">COLOR</span>
@@ -71,6 +70,7 @@ export function FloatingLightModal({
                 type="button"
                 onClick={() => onColorChange(light.id, c)}
                 style={{ backgroundColor: c }}
+                // EDGE CASE: light.color being undefined or null will throw TypeError on .toLowerCase()
                 className={`w-3.5 h-3.5 rounded-full border cursor-pointer active:scale-90 transition ${
                   light.color.toLowerCase() === c.toLowerCase()
                     ? 'border-[#AE0D0A] scale-110'
@@ -82,7 +82,6 @@ export function FloatingLightModal({
         </div>
       )}
 
-      {/* Cast Shadow Toggle for Directional Lights */}
       {light.type === 'directional' && onToggleShadow && (
         <div className="flex items-center justify-between pt-1 border-t border-[#730907]/30">
           <span className="text-[8.5px] font-bold text-[#F5F5F5]/60">SHADOW</span>

@@ -58,24 +58,14 @@ export function CameraCard({ stage }: CameraCardProps) {
     }
   };
 
-  const handleCyclePrev = () => {
+  const handleCycle = (direction: -1 | 1) => {
     if (cameras.length <= 1) return;
     const currentId = activeCameraId || selectedCamId;
     const idx = cameras.findIndex((c) => c.id === currentId);
-    const prevIdx = idx <= 0 ? cameras.length - 1 : idx - 1;
-    stage.controlsManager.selectCamera(cameras[prevIdx].id);
-  };
-
-  const handleCycleNext = () => {
-    if (cameras.length <= 1) return;
-    const currentId = activeCameraId || selectedCamId;
-    const idx = cameras.findIndex((c) => c.id === currentId);
-    const nextIdx = (idx + 1) % cameras.length;
-    stage.controlsManager.selectCamera(cameras[nextIdx].id);
-  };
-
-  const handleAddCamera = () => {
-    stage.controlsManager.addCamera();
+    const targetIdx = direction === -1
+      ? (idx <= 0 ? cameras.length - 1 : idx - 1)
+      : (idx + 1) % cameras.length;
+    stage.controlsManager.selectCamera(cameras[targetIdx].id);
   };
 
   const FOV_PRESETS = [
@@ -87,7 +77,6 @@ export function CameraCard({ stage }: CameraCardProps) {
 
   return (
     <div className="mx-auto mt-3.5 w-[calc(100%-16px)] min-h-[267px] bg-[#730907]/40 rounded-[9px] overflow-hidden flex flex-col border-0 shadow-none font-['Rethink_Sans']">
-      {/* Header Banner - Written exact how TRANSFORM is written */}
       <div className="w-full h-[19px] bg-[#730907] flex items-center justify-center px-2">
         <span className="text-[11px] font-bold text-[#AD0D0A] uppercase tracking-wider truncate">
           CAMERA
@@ -95,7 +84,6 @@ export function CameraCard({ stage }: CameraCardProps) {
       </div>
 
       {cameras.length === 0 ? (
-        /* Empty State: No Cameras */
         <div className="flex-1 flex flex-col items-center justify-center p-3 text-center">
           <Camera className="w-6 h-6 text-[#F5F5F5]/30 mb-2" />
           <span className="text-[10px] font-semibold text-[#F5F5F5]/60 mb-3">
@@ -103,7 +91,7 @@ export function CameraCard({ stage }: CameraCardProps) {
           </span>
           <button
             type="button"
-            onClick={handleAddCamera}
+            onClick={() => stage.controlsManager.addCamera()}
             className="w-full h-[23px] rounded-[12px] bg-[#730907] hover:bg-[#AE0D0A] text-[#F5F5F5] font-semibold text-[10px] flex items-center justify-center gap-1 cursor-pointer active:scale-95 transition border-0 shadow-none"
           >
             <Plus className="w-3 h-3 pointer-events-none" />
@@ -111,13 +99,11 @@ export function CameraCard({ stage }: CameraCardProps) {
           </button>
         </div>
       ) : (
-        /* Active Camera & Controls */
         <div className="p-2 flex flex-col gap-2.5">
-          {/* Camera Selector Strip */}
           <div className="w-full h-[26px] bg-[#360403] rounded-[10px] flex items-center justify-between px-1.5 border-0 shadow-none">
             <button
               type="button"
-              onClick={handleCyclePrev}
+              onClick={() => handleCycle(-1)}
               disabled={cameras.length <= 1}
               title="Previous camera"
               className="w-4 h-4 flex items-center justify-center text-[#F5F5F5]/70 hover:text-white disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed"
@@ -125,12 +111,12 @@ export function CameraCard({ stage }: CameraCardProps) {
               <ChevronLeft className="w-3 h-3" />
             </button>
             <span className="text-[9px] font-bold uppercase tracking-wider text-[#F5F5F5] truncate px-1">
-              {activeCam ? activeCam.name : 'CAMERA'}
+              {activeCam.name}
             </span>
             <div className="flex items-center gap-0.5">
               <button
                 type="button"
-                onClick={handleCycleNext}
+                onClick={() => handleCycle(1)}
                 disabled={cameras.length <= 1}
                 title="Next camera"
                 className="w-4 h-4 flex items-center justify-center text-[#F5F5F5]/70 hover:text-white disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed"
@@ -139,7 +125,7 @@ export function CameraCard({ stage }: CameraCardProps) {
               </button>
               <button
                 type="button"
-                onClick={handleAddCamera}
+                onClick={() => stage.controlsManager.addCamera()}
                 title="Add new camera"
                 className="w-4 h-4 rounded-full bg-[#730907] hover:bg-[#AE0D0A] flex items-center justify-center text-white cursor-pointer transition active:scale-90"
               >
@@ -148,7 +134,6 @@ export function CameraCard({ stage }: CameraCardProps) {
             </div>
           </div>
 
-          {/* Section Header: FOV & View Status */}
           <div className="flex items-center justify-between px-1">
             <div className="flex items-center gap-1 text-[#F5F5F5]/60 text-[9px] font-bold uppercase tracking-wider">
               <SlidersHorizontal className="w-2.5 h-2.5 text-[#AE0D0A]" />
@@ -175,7 +160,6 @@ export function CameraCard({ stage }: CameraCardProps) {
             </div>
           </div>
 
-          {/* Unified FOV Slider Card */}
           <div className="w-full bg-[#360403] rounded-[15px] p-2.5 flex flex-col gap-2 border-0 shadow-none">
             <div className="flex items-baseline justify-between px-0.5">
               <span className="text-[18px] font-bold text-[#F5F5F5] leading-none tracking-tight">
@@ -186,7 +170,7 @@ export function CameraCard({ stage }: CameraCardProps) {
               </span>
             </div>
 
-            {/* Custom Range Slider */}
+            {/* EDGE CASE: non-numeric or empty input passes NaN to handleFovChange, corrupting camera projection matrix */}
             <input
               type="range"
               min="10"
@@ -197,7 +181,6 @@ export function CameraCard({ stage }: CameraCardProps) {
               className="w-full h-1.5 bg-[#07050F] rounded-full appearance-none cursor-pointer accent-[#AE0D0A] focus:outline-none"
             />
 
-            {/* Preset FOV Pills */}
             <div className="grid grid-cols-4 gap-1 mt-1">
               {FOV_PRESETS.map((p) => (
                 <button

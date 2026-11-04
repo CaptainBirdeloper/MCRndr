@@ -13,7 +13,6 @@ export function createLightGlyph(type: LightType, color = 0xfff3e0): THREE.Group
   });
 
   if (type === 'directional') {
-    // Sun ring + directional arrow rays
     const circlePoints: THREE.Vector3[] = [];
     const segments = 16;
     const r = 0.12;
@@ -25,7 +24,6 @@ export function createLightGlyph(type: LightType, color = 0xfff3e0): THREE.Group
     const circle = new THREE.LineLoop(circleGeo, material);
     group.add(circle);
 
-    // Directional ray forward (-Z)
     const rayGeo = new THREE.BufferGeometry().setFromPoints([
       new THREE.Vector3(0, 0, 0),
       new THREE.Vector3(0, 0, -0.4),
@@ -33,14 +31,12 @@ export function createLightGlyph(type: LightType, color = 0xfff3e0): THREE.Group
     const ray = new THREE.Line(rayGeo, material);
     group.add(ray);
   } else {
-    // Omnidirectional point bulb wireframe
     const sphereGeo = new THREE.SphereGeometry(0.1, 8, 6);
     const wireframe = new THREE.WireframeGeometry(sphereGeo);
     const line = new THREE.LineSegments(wireframe, material);
     group.add(line);
   }
 
-  // Raycastable hit mesh (invisible sphere)
   const hitGeo = new THREE.SphereGeometry(0.22, 8, 6);
   const hitMat = new THREE.MeshBasicMaterial({ visible: false });
   const hitMesh = new THREE.Mesh(hitGeo, hitMat);
