@@ -43,6 +43,13 @@ export interface EngineEvents {
   onTransformChange: (part: BodyPartName, rot: PartEuler, pos: PartEuler) => void;
 }
 
+export interface PlayerItem {
+  id: string;
+  name: string;
+  skinName: string | null;
+  armType: ArmType;
+}
+
 export interface CameraItem {
   id: string;
   name: string;
@@ -51,7 +58,6 @@ export interface CameraItem {
 }
 
 export type LightType = 'directional' | 'point' | 'spot' | 'ambient';
-export type LightingStyle = 'realistic' | 'minecrafty';
 
 export interface LightItem {
   id: string;

@@ -20,6 +20,7 @@ export interface MinecraftRig {
   setArmType: (type: ArmType) => void;
   armType: ArmType;
   resetPose: () => void;
+  dispose: () => void;
 }
 
 export function createMinecraftRig(initialTexture: THREE.CanvasTexture, initialArmType: ArmType = 'steve'): MinecraftRig {
@@ -71,7 +72,9 @@ export function createMinecraftRig(initialTexture: THREE.CanvasTexture, initialA
     setMinecraftBoxUV(outerGeo, outerUV);
     const outerMesh = new THREE.Mesh(outerGeo, outerMat);
     outerMesh.position.set(meshOffsetX, meshOffsetY, 0);
-    outerMesh.castShadow = true;
+    // EDGE CASE: the outer layer sits 0.0175 outside the base part on every face; letting it
+    // cast shadows paints a bright hairline of shadow-acne on the base surface at part seams
+    outerMesh.castShadow = false;
     outerMesh.receiveShadow = true;
     outerMesh.name = `outer_${partName}`;
     outerMesh.userData = { partName, isBodyPart: true };
@@ -217,6 +220,15 @@ export function createMinecraftRig(initialTexture: THREE.CanvasTexture, initialA
     root.position.set(0, 0, 0);
   }
 
+  function dispose() {
+    root.traverse((child) => {
+      const mesh = child as THREE.Mesh;
+      if (mesh.isMesh) mesh.geometry.dispose();
+    });
+    baseMat.dispose();
+    outerMat.dispose();
+  }
+
   return {
     root,
     joints,
@@ -227,5 +239,6 @@ export function createMinecraftRig(initialTexture: THREE.CanvasTexture, initialA
       return currentArmType;
     },
     resetPose,
+    dispose,
   };
 }

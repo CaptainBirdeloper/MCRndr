@@ -156,4 +156,11 @@ export class ShaderPassManager {
   public get pass(): ShaderPassMode {
     return this.currentMode;
   }
+
+  public dispose() {
+    this.wemMaterial.dispose();
+    this.normalMaterial.dispose();
+    this.clownMaterials.forEach((material) => material.dispose());
+    this.clownMaterials.clear();
+  }
 }

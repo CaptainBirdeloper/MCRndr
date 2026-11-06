@@ -7,6 +7,7 @@ import { createCameraManager, ManagedCamera } from '../camera/cameraManager';
 import { LightingManager } from '../lighting/lightingManager';
 import { createHistoryManager, HistoryAction } from './history';
 import { createModalTransformEngine, ModalTransform } from './modalTransform';
+import { PlayerManager } from '../players/playerManager';
 
 export type { ManagedCamera, HistoryAction, ModalTransform };
 
@@ -15,6 +16,7 @@ export interface RigControlsManager {
   transformMode: TransformMode;
   space: 'local' | 'world';
   selectPart: (part: BodyPartName | null) => void;
+  setActiveRig: (rig: MinecraftRig) => void;
   setMode: (mode: TransformMode) => void;
   toggleSpace: () => void;
   resetSelectedPart: () => void;
@@ -79,7 +81,8 @@ export function setupRigControls(
   orbitControls: OrbitControls,
   rig: MinecraftRig,
   lightingManager?: LightingManager,
-  onSelectionChange?: (part: BodyPartName | null, rotDeg: [number, number, number]) => void
+  onSelectionChange?: (part: BodyPartName | null, rotDeg: [number, number, number]) => void,
+  playerManager?: PlayerManager
 ): RigControlsManager {
   const raycaster = new THREE.Raycaster();
   const mouse = new THREE.Vector2();
@@ -98,6 +101,12 @@ export function setupRigControls(
   scene.add(gizmoHelper);
 
   const boxHelper = new THREE.BoxHelper(rig.root, 0x38bdf8);
+  // EDGE CASE: box edges are coplanar with the part faces, z-fighting renders them as dotted hairlines
+  const boxMat = boxHelper.material as THREE.LineBasicMaterial;
+  boxMat.depthTest = false;
+  boxMat.transparent = true;
+  boxMat.opacity = 0.85;
+  boxHelper.renderOrder = 996;
   boxHelper.visible = false;
   scene.add(boxHelper);
 
@@ -166,7 +175,7 @@ export function setupRigControls(
     notifyAngleChange(part);
   }
 
-  const historyManager = createHistoryManager(rig, boxHelper, {
+  const historyManager = createHistoryManager(() => rig, boxHelper, {
     notifyRootTransform,
     notifyPartTransform,
     notifyAngleChange,
@@ -176,7 +185,7 @@ export function setupRigControls(
     scene,
     camera,
     domElement,
-    rig,
+    () => rig,
     orbitControls,
     gizmo,
     boxHelper,
@@ -334,6 +343,24 @@ export function setupRigControls(
     notifyAngleChange(part);
   }
 
+  function setActiveRig(nextRig: MinecraftRig) {
+    if (rig === nextRig) return;
+    if (modalTransformEngine.isModalActive()) {
+      modalTransformEngine.finishModal(selectedPart);
+    }
+    gizmo.detach();
+    rig = nextRig;
+    selectedPart = null;
+    historyManager.reset();
+    boxHelper.setFromObject(rig.root);
+    boxHelper.visible = false;
+    gizmo.getHelper().visible = false;
+    onSelectionChange?.(null, [0, 0, 0]);
+    if (wholeBodyMode) {
+      selectPart('root');
+    }
+  }
+
   function setMode(mode: TransformMode) {
     transformMode = mode;
     gizmo.setMode(mode);
@@ -396,21 +423,34 @@ export function setupRigControls(
       }
     }
 
+    const targetRigs = playerManager ? playerManager.getAllRigs() : [rig];
     const meshes: THREE.Object3D[] = [];
-    rig.root.traverse((child) => {
-      if ((child as THREE.Mesh).isMesh && child.userData.isBodyPart) {
-        meshes.push(child);
-      }
+    targetRigs.forEach((targetRig) => {
+      targetRig.root.traverse((child) => {
+        if ((child as THREE.Mesh).isMesh && child.userData.isBodyPart) {
+          meshes.push(child);
+        }
+      });
     });
 
     const intersects = raycaster.intersectObjects(meshes, true);
     if (intersects.length > 0) {
       lightingManager?.selectLight(null);
+      const hit = intersects[0];
+
+      if (playerManager) {
+        let node: THREE.Object3D | null = hit.object;
+        while (node && !node.userData.playerId) node = node.parent;
+        const hitPlayerId = node?.userData.playerId as string | undefined;
+        if (hitPlayerId && hitPlayerId !== playerManager.getActiveId()) {
+          playerManager.selectPlayer(hitPlayerId);
+        }
+      }
+
       if (wholeBodyMode) {
         selectPart('root');
         return;
       }
-      const hit = intersects[0];
       const partName = hit.object.userData.partName as BodyPartName;
       if (partName) {
         selectPart(partName);
@@ -626,6 +666,7 @@ export function setupRigControls(
       return space;
     },
     selectPart,
+    setActiveRig,
     setMode,
     toggleSpace,
     resetSelectedPart,

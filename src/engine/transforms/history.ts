@@ -55,6 +55,7 @@ export interface HistoryManager {
   pushAction: (action: HistoryAction) => void;
   undo: () => void;
   redo: () => void;
+  reset: () => void;
   commitPositionHistory: (axis: 'x' | 'y' | 'z', prev: number, next: number) => void;
   commitRotationHistory: (axis: 'x' | 'y' | 'z', prev: number, next: number) => void;
   commitPartPositionHistory: (part: BodyPartName, axis: 'x' | 'y' | 'z', prev: number, next: number) => void;
@@ -64,7 +65,7 @@ export interface HistoryManager {
 }
 
 export function createHistoryManager(
-  rig: MinecraftRig,
+  getRig: () => MinecraftRig,
   boxHelper: THREE.BoxHelper,
   callbacks: HistoryCallbacks
 ): HistoryManager {
@@ -126,6 +127,7 @@ export function createHistoryManager(
   }
 
   function applyHistoryAction(action: HistoryAction, direction: 'prev' | 'next') {
+    const rig = getRig();
     if (action.type === 'root_pos_axis') {
       const val = direction === 'prev' ? action.prev : action.next;
       rig.root.position[action.axis] = val / 100;
@@ -198,10 +200,16 @@ export function createHistoryManager(
     undoStack.push(action);
   }
 
+  function reset() {
+    undoStack.length = 0;
+    redoStack.length = 0;
+  }
+
   return {
     pushAction,
     undo,
     redo,
+    reset,
     commitPositionHistory,
     commitRotationHistory,
     commitPartPositionHistory,

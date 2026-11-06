@@ -71,7 +71,7 @@ export function TransformCard({
   );
 
   return (
-    <div className="mx-auto mt-3.5 w-[calc(100%-16px)] min-h-[267px] bg-[#730907]/40 rounded-[9px] overflow-hidden flex flex-col border-0 shadow-none">
+    <div className="mt-3.5 w-full min-h-[267px] bg-[#730907]/40 rounded-[9px] overflow-hidden flex flex-col border-0 shadow-none">
       <div className="w-full h-[19px] bg-[#730907] flex items-center justify-center px-2">
         <span className="text-[11px] font-bold text-[#AD0D0A] uppercase tracking-wider truncate">
           {activeTab === 'BODY'

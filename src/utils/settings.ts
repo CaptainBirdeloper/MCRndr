@@ -1,6 +1,7 @@
 export interface UserSettings {
   perpetualFov: number;
   orbitSensitivity: number;
+  panSpeed: number;
   uiZoom: number;
   showGrid: boolean;
   showCameraGlyphs: boolean;
@@ -9,6 +10,7 @@ export interface UserSettings {
 export const DEFAULT_SETTINGS: UserSettings = {
   perpetualFov: 38,
   orbitSensitivity: 1.0,
+  panSpeed: 2.0,
   uiZoom: 125,
   showGrid: true,
   showCameraGlyphs: true,
@@ -35,6 +37,7 @@ export function loadSettings(): UserSettings {
     return {
       perpetualFov: typeof parsed.perpetualFov === 'number' ? Math.max(20, Math.min(90, parsed.perpetualFov)) : DEFAULT_SETTINGS.perpetualFov,
       orbitSensitivity: typeof parsed.orbitSensitivity === 'number' ? Math.max(0.2, Math.min(2.5, parsed.orbitSensitivity)) : DEFAULT_SETTINGS.orbitSensitivity,
+      panSpeed: typeof parsed.panSpeed === 'number' ? Math.max(0.5, Math.min(8, parsed.panSpeed)) : DEFAULT_SETTINGS.panSpeed,
       uiZoom: effectiveZoom,
       showGrid: typeof parsed.showGrid === 'boolean' ? parsed.showGrid : DEFAULT_SETTINGS.showGrid,
       showCameraGlyphs: typeof parsed.showCameraGlyphs === 'boolean' ? parsed.showCameraGlyphs : DEFAULT_SETTINGS.showCameraGlyphs,

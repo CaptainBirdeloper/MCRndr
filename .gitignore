@@ -7,3 +7,6 @@ dist
 Thumbs.db
 temp/
 .agents/
+
+# Local design exports and scratch notes
+docs/

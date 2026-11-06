@@ -1,15 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { createScene, SceneStage } from '../engine/render/scene';
-import { BodyPartName, ArmType } from '../types';
+import { BodyPartName } from '../types';
 import { UploadCloud } from 'lucide-react';
 
 interface ViewportProps {
   onStageReady?: (stage: SceneStage) => void;
-  onSkinLoaded?: (fileName: string, armType: ArmType) => void;
   onSelectionChange?: (part: BodyPartName | null, rotDeg: [number, number, number]) => void;
+  onContextMenu?: (e: React.MouseEvent) => void;
 }
 
-export function Viewport({ onStageReady, onSkinLoaded, onSelectionChange }: ViewportProps) {
+export function Viewport({ onStageReady, onSelectionChange, onContextMenu }: ViewportProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<SceneStage | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -20,9 +20,6 @@ export function Viewport({ onStageReady, onSkinLoaded, onSelectionChange }: View
 
   const onStageReadyRef = useRef(onStageReady);
   onStageReadyRef.current = onStageReady;
-
-  const onSkinLoadedRef = useRef(onSkinLoaded);
-  onSkinLoadedRef.current = onSkinLoaded;
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -52,8 +49,7 @@ export function Viewport({ onStageReady, onSkinLoaded, onSelectionChange }: View
     const file = e.dataTransfer.files?.[0];
     if (file && file.type === 'image/png' && stageRef.current) {
       // EDGE CASE: loadSkinFile rejection on corrupt or invalid PNG causes unhandled Promise rejection without user error feedback
-      const armType = await stageRef.current.loadSkinFile(file);
-      onSkinLoadedRef.current?.(file.name, armType);
+      await stageRef.current.loadSkinFile(file);
     }
   };
 
@@ -63,6 +59,7 @@ export function Viewport({ onStageReady, onSkinLoaded, onSelectionChange }: View
       onDragOver={(e) => handleDragState(e, true)}
       onDragLeave={(e) => handleDragState(e, false)}
       onDrop={handleDrop}
+      onContextMenu={onContextMenu}
       className="relative w-full h-full bg-[#07050F] overflow-hidden"
     >
       {/* Viewport Vignette Overlay (pointer-events-none ensures zero click interception) */}

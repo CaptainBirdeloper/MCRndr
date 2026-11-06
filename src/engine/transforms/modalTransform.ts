@@ -14,6 +14,8 @@ export interface ModalTransform {
   startQuat: THREE.Quaternion;
   pivotWorld: THREE.Vector3;
   pivotScreen: THREE.Vector2;
+  part: BodyPartName | 'root' | null;
+  target: THREE.Object3D;
   customTarget?: THREE.Object3D;
 }
 
@@ -42,7 +44,7 @@ export function createModalTransformEngine(
   scene: THREE.Scene,
   camera: THREE.PerspectiveCamera,
   domElement: HTMLElement,
-  rig: MinecraftRig,
+  getRig: () => MinecraftRig,
   orbitControls: OrbitControls,
   gizmo: TransformControls,
   boxHelper: THREE.BoxHelper,
@@ -69,12 +71,40 @@ export function createModalTransformEngine(
   scene.add(axisLine);
 
   function getTarget(part: BodyPartName | 'root' | null): { group: THREE.Object3D } | null {
+    const rig = getRig();
     if (!part) return null;
     if (part === 'root') return { group: rig.root };
     return rig.joints[part] || null;
   }
 
-  function initModal(mode: 'translate' | 'rotate', targetObject: THREE.Object3D, customTarget?: THREE.Object3D) {
+  // Commit whatever the open modal session has already moved, so successive
+  // restricted (axis-locked) segments each land as their own undo step.
+  function commitPendingModal() {
+    if (!modal || modal.customTarget) return;
+    const endPos = modal.target.position;
+    const endQuat = modal.target.quaternion;
+    if (endPos.equals(modal.startPos) && endQuat.equals(modal.startQuat)) return;
+    historyManager.pushAction({
+      type: 'modal_transform',
+      part: (modal.part ?? 'root') as BodyPartName,
+      prevPos: modal.startPos.clone(),
+      prevQuat: modal.startQuat.clone(),
+      nextPos: endPos.clone(),
+      nextQuat: endQuat.clone(),
+    });
+    modal.startPos.copy(endPos);
+    modal.startQuat.copy(endQuat);
+  }
+
+  function initModal(
+    mode: 'translate' | 'rotate',
+    targetObject: THREE.Object3D,
+    customTarget?: THREE.Object3D,
+    part: BodyPartName | 'root' | null = null
+  ) {
+    // EDGE CASE: starting a new modal while one is still open would overwrite the
+    // session and silently drop its transform from history
+    if (modal) finishModal(modal.part);
     // Joint point is always the anatomical pivot
     const pivotWorld = new THREE.Vector3();
     targetObject.getWorldPosition(pivotWorld);
@@ -96,6 +126,8 @@ export function createModalTransformEngine(
       startQuat: targetObject.quaternion.clone(),
       pivotWorld,
       pivotScreen,
+      part,
+      target: targetObject,
       customTarget,
     };
 
@@ -106,7 +138,7 @@ export function createModalTransformEngine(
   function startModal(mode: 'translate' | 'rotate', selectedPart: BodyPartName | 'root' | null) {
     const target = getTarget(selectedPart);
     if (!target) return;
-    initModal(mode, target.group);
+    initModal(mode, target.group, undefined, selectedPart);
   }
 
   function startModalObject(mode: 'translate' | 'rotate', object: THREE.Object3D) {
@@ -125,21 +157,7 @@ export function createModalTransformEngine(
       axisLine.visible = false;
       return;
     }
-    const target = getTarget(selectedPart);
-    if (target) {
-      const endPos = target.group.position.clone();
-      const endQuat = target.group.quaternion.clone();
-      if (!endPos.equals(modal.startPos) || !endQuat.equals(modal.startQuat)) {
-        historyManager.pushAction({
-          type: 'modal_transform',
-          part: selectedPart as BodyPartName,
-          prevPos: modal.startPos.clone(),
-          prevQuat: modal.startQuat.clone(),
-          nextPos: endPos,
-          nextQuat: endQuat,
-        });
-      }
-    }
+    commitPendingModal();
 
     modal = null;
     orbitControls.enabled = true;
@@ -272,6 +290,8 @@ export function createModalTransformEngine(
     gizmo.showX = axis === 'x';
     gizmo.showY = axis === 'y';
     gizmo.showZ = axis === 'z';
+    // Each axis-locked segment is its own undo step
+    commitPendingModal();
     modal.startClientX = lastPointerPos.x;
     modal.startClientY = lastPointerPos.y;
     modal.startPos.copy(target.group.position);

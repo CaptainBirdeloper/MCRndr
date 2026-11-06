@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { SceneStage } from '../../engine/render/scene';
-import { LightItem, LightingStyle } from '../../types';
+import { LightItem } from '../../types';
 import { Sun, Eye, EyeOff } from 'lucide-react';
 
 interface LightingCardProps {
@@ -10,19 +10,16 @@ interface LightingCardProps {
 export function LightingCard({ stage }: LightingCardProps) {
   const [lights, setLights] = useState<LightItem[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [style, setStyle] = useState<LightingStyle>('realistic');
 
   useEffect(() => {
     if (!stage?.lightingManager) return;
     const lm = stage.lightingManager;
     setLights(lm.getLights());
     setActiveId(lm.getActiveLightId());
-    setStyle(lm.getStyle());
 
     lm.setChangeListener((updatedLights, active) => {
       setLights([...updatedLights]);
       setActiveId(active);
-      setStyle(lm.getStyle());
     });
   }, [stage]);
 
@@ -30,33 +27,12 @@ export function LightingCard({ stage }: LightingCardProps) {
 
   return (
     <div className="w-full flex flex-col gap-2 font-['Rethink_Sans'] select-none">
-      <div className="mx-auto w-[calc(100%-16px)] bg-[#730907]/40 rounded-[14px] p-2 flex flex-col gap-2">
+      <div className="w-full bg-[#730907]/40 rounded-[14px] p-2 flex flex-col gap-2">
         <div className="w-full flex items-center justify-between px-1">
           <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#F5F5F5] uppercase tracking-wider">
             <Sun className="w-3.5 h-3.5 text-[#AE0D0A]" />
             <span>Lighting</span>
           </div>
-        </div>
-
-        <div className="w-full h-[22px] bg-[#07050F] p-[2px] rounded-full flex items-center">
-          <button
-            type="button"
-            onClick={() => stage?.lightingManager.setStyle('realistic')}
-            className={`flex-1 h-full rounded-full text-[8.5px] font-bold uppercase tracking-wider transition ${
-              style === 'realistic' ? 'bg-[#AE0D0A] text-white' : 'text-[#F5F5F5]/60 hover:text-white'
-            }`}
-          >
-            Realistic
-          </button>
-          <button
-            type="button"
-            onClick={() => stage?.lightingManager.setStyle('minecrafty')}
-            className={`flex-1 h-full rounded-full text-[8.5px] font-bold uppercase tracking-wider transition ${
-              style === 'minecrafty' ? 'bg-[#AE0D0A] text-white' : 'text-[#F5F5F5]/60 hover:text-white'
-            }`}
-          >
-            Minecrafty
-          </button>
         </div>
 
         <div className="flex flex-col gap-1 max-h-[120px] overflow-y-auto custom-deck-scrollbar">

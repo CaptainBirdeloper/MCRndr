@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { SceneStage } from '../../engine/render/scene';
 import { BodyPartName } from '../../types';
@@ -14,7 +14,6 @@ interface LeftSidebarProps {
   activePoseId: string | null;
   selectedPart: BodyPartName | null;
   onPoseSelect: (id: string) => void;
-  onSkinLoaded: (fileName: string, armType: 'steve' | 'alex') => void;
   onOpenExport: () => void;
   onOpenSettings: (origin: { x: number; y: number }) => void;
   isCollapsed: boolean;
@@ -27,7 +26,6 @@ export function LeftSidebar({
   activePoseId,
   selectedPart,
   onPoseSelect,
-  onSkinLoaded,
   onOpenExport,
   onOpenSettings,
   isCollapsed,
@@ -105,8 +103,7 @@ export function LeftSidebar({
     const file = e.target.files?.[0];
     if (file && stage) {
       // EDGE CASE: loadSkinFile rejection on corrupt skin file causes unhandled Promise rejection and blocks re-upload
-      const detectedArm = await stage.loadSkinFile(file);
-      onSkinLoaded(file.name, detectedArm);
+      await stage.loadSkinFile(file);
     }
   };
 
@@ -160,6 +157,34 @@ export function LeftSidebar({
   const handlePosChange = (axis: 'x' | 'y' | 'z', valStr: string) => handleTransformAxisChange('pos', axis, valStr);
   const handleRotChange = (axis: 'x' | 'y' | 'z', valStr: string) => handleTransformAxisChange('rot', axis, valStr);
 
+  // Scroll affordance: the top fade only shows when there is content hidden above
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [fadeTop, setFadeTop] = useState(false);
+
+  const updateFades = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setFadeTop(el.scrollTop > 2);
+  };
+
+  useEffect(() => {
+    const observer = new ResizeObserver(updateFades);
+    if (scrollRef.current) observer.observe(scrollRef.current);
+    if (contentRef.current) observer.observe(contentRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  // Run before paint so a tab switch never shows one frame of hard-clipped content
+  useLayoutEffect(() => {
+    updateFades();
+  });
+
+  useLayoutEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+    updateFades();
+  }, [activeTab]);
+
   return (
     <>
       <input
@@ -173,10 +198,9 @@ export function LeftSidebar({
       <motion.aside
         animate={{ x: isCollapsed ? -214 : 0 }}
         transition={SMOOTH}
-        className="absolute left-0 top-0 bottom-0 z-40 w-[214px] bg-[#360403] flex flex-col justify-between select-none font-['Rethink_Sans'] border-0 shadow-none overflow-y-auto custom-deck-scrollbar"
+        className="absolute left-0 top-0 bottom-0 z-40 w-[214px] bg-[#360403] flex flex-col select-none font-['Rethink_Sans'] border-0 shadow-none overflow-hidden"
       >
-        <div className="flex flex-col">
-          <div className="relative w-full h-[26px] bg-[#730907] p-[3px] flex items-center">
+        <div className="relative w-full h-[26px] shrink-0 bg-[#730907] p-[3px] flex items-center">
             <motion.div
               className="absolute top-[3px] bottom-[3px] rounded-full bg-[#AE0D0A] pointer-events-none"
               style={{
@@ -218,30 +242,45 @@ export function LeftSidebar({
             </button>
           </div>
 
-          {activeTab === 'WORLD' ? (
-            <div className="flex flex-col gap-2">
-              <CameraCard stage={stage} />
-              <LightingCard stage={stage} />
+        <div className="relative flex-1 min-h-0">
+          <div
+            ref={scrollRef}
+            onScroll={updateFades}
+            className="w-full h-full overflow-y-auto overflow-x-hidden overscroll-contain custom-deck-scrollbar px-2.5"
+          >
+            <div ref={contentRef} className="flex flex-col gap-2">
+              {activeTab === 'WORLD' ? (
+                <>
+                  <CameraCard stage={stage} />
+                  <LightingCard stage={stage} />
+                </>
+              ) : (
+                <TransformCard
+                  activeTab={activeTab}
+                  selectedPart={selectedPart}
+                  rootPos={rootPos}
+                  rootRot={rootRot}
+                  partPos={partPos}
+                  partRot={partRot}
+                  onFocus={handleFocus}
+                  onBlur={handleBlur}
+                  onPosChange={handlePosChange}
+                  onRotChange={handleRotChange}
+                  activePoseId={activePoseId}
+                  onPoseSelect={onPoseSelect}
+                />
+              )}
             </div>
-          ) : (
-            <TransformCard
-              activeTab={activeTab}
-              selectedPart={selectedPart}
-              rootPos={rootPos}
-              rootRot={rootRot}
-              partPos={partPos}
-              partRot={partRot}
-              onFocus={handleFocus}
-              onBlur={handleBlur}
-              onPosChange={handlePosChange}
-              onRotChange={handleRotChange}
-              activePoseId={activePoseId}
-              onPoseSelect={onPoseSelect}
-            />
-          )}
+          </div>
+
+          <div
+            className={`pointer-events-none absolute inset-x-0 top-0 z-10 h-6 bg-gradient-to-b from-[#360403] to-transparent transition-opacity duration-75 ${
+              fadeTop ? 'opacity-100' : 'opacity-0'
+            }`}
+          />
         </div>
 
-        <div className="w-full flex flex-col gap-1.5 pb-2.5">
+        <div className="w-full shrink-0 flex flex-col gap-1.5 pt-2.5 pb-2.5 border-t border-[#730907]/40">
           <div className="w-full px-2.5 box-border">
             <motion.button
               whileTap={{ scale: 0.95 }}

@@ -6,15 +6,18 @@ import { CameraDropdown } from './components/camera/CameraDropdown';
 import { ExportModal } from './components/modals/ExportModal';
 import { SettingsModal } from './components/modals/SettingsModal';
 import { FloatingLightModal } from './components/modals/FloatingLightModal';
+import { CanvasContextMenu } from './components/context/CanvasContextMenu';
+import { MAX_PLAYERS } from './engine/players/playerManager';
 import { loadSettings } from './utils/settings';
 import { SceneStage } from './engine/render/scene';
-import { ArmType, BodyPartName, ShaderPassMode, LightItem } from './types';
+import { BodyPartName, ShaderPassMode, LightItem, PlayerItem } from './types';
 import { POSE_PRESETS } from './presets/poses';
 
 export function App() {
   const [stage, setStage] = useState<SceneStage | null>(null);
-  const [, setArmType] = useState<ArmType>('steve');
-  const [skinName, setSkinName] = useState<string | null>(null);
+  const [players, setPlayers] = useState<PlayerItem[]>([]);
+  const [activePlayerId, setActivePlayerId] = useState<string>('');
+  const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null);
   const [selectedPart, setSelectedPart] = useState<BodyPartName | null>(null);
   const [, setRotationDeg] = useState<[number, number, number]>([0, 0, 0]);
   const [activePoseId, setActivePoseId] = useState<string | null>(null);
@@ -49,10 +52,6 @@ export function App() {
     if (intensityParam && selectLightParam) {
       // EDGE CASE: parseFloat(intensityParam) can evaluate to NaN for non-numeric query values, corrupting light calculations
       stage.lightingManager.setLightIntensity(selectLightParam, parseFloat(intensityParam));
-    }
-    const styleParam = params.get('lightStyle');
-    if (styleParam === 'minecrafty' || styleParam === 'realistic') {
-      stage.lightingManager.setStyle(styleParam);
     }
     if (params.get('addCamera') === '1') {
       stage.controlsManager.addCamera();
@@ -93,6 +92,38 @@ export function App() {
   }, [stage]);
 
   useEffect(() => {
+    if (!stage) return;
+    const pm = stage.players;
+    const sync = (list: PlayerItem[], activeId: string) => {
+      setPlayers(list);
+      setActivePlayerId(activeId);
+    };
+    pm.setChangeListener(sync);
+    return () => pm.removeChangeListener(sync);
+  }, [stage]);
+
+  useEffect(() => {
+    setActivePoseId(null);
+  }, [activePlayerId]);
+
+  useEffect(() => {
+    if (!stage) return;
+    const handlePlayerHotkey = (e: KeyboardEvent) => {
+      if (!e.altKey) return;
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      const match = /^Digit([1-8])$/.exec(e.code);
+      if (!match) return;
+      const target = stage.players.getPlayers()[Number(match[1]) - 1];
+      if (target) {
+        e.preventDefault();
+        stage.players.selectPlayer(target.id);
+      }
+    };
+    window.addEventListener('keydown', handlePlayerHotkey);
+    return () => window.removeEventListener('keydown', handlePlayerHotkey);
+  }, [stage]);
+
+  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       if (e.code === 'KeyH') {
@@ -113,12 +144,8 @@ export function App() {
     }
   };
 
-  const handleSkinLoaded = (name: string, detectedArm: ArmType) => {
-    // EDGE CASE: name may be undefined or null if file has no name, throwing TypeError on .replace()
-    const cleanName = name.replace(/\.png$/i, '');
-    setSkinName(cleanName);
-    setArmType(detectedArm);
-  };
+  const activePlayer = players.find((p) => p.id === activePlayerId) ?? players[0] ?? null;
+  const skinName = activePlayer?.skinName ?? null;
 
   return (
     <MotionConfig reducedMotion="user">
@@ -126,7 +153,10 @@ export function App() {
         <main className="w-full h-full absolute inset-0">
           <Viewport
             onStageReady={setStage}
-            onSkinLoaded={handleSkinLoaded}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setContextMenuPos({ x: e.clientX, y: e.clientY });
+            }}
             onSelectionChange={(part, deg) => {
               setSelectedPart(part);
               setRotationDeg(deg);
@@ -147,7 +177,6 @@ export function App() {
               activePoseId={activePoseId}
               selectedPart={selectedPart}
               onPoseSelect={handlePoseSelect}
-              onSkinLoaded={handleSkinLoaded}
               onOpenExport={() => setShowExportModal(true)}
               onOpenSettings={(origin) => {
                 setSettingsOrigin(origin);
@@ -169,6 +198,16 @@ export function App() {
             />
           )}
         </AnimatePresence>
+
+        {contextMenuPos && (
+          <CanvasContextMenu
+            x={contextMenuPos.x}
+            y={contextMenuPos.y}
+            canAdd={players.length < MAX_PLAYERS}
+            onAdd={() => stage?.players.createPlayer()}
+            onClose={() => setContextMenuPos(null)}
+          />
+        )}
 
         {activeLight && lightScreenPos && (
           <FloatingLightModal

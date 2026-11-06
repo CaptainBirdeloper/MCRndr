@@ -21,6 +21,7 @@ export function SettingsModal({ onClose, origin, stage, onSettingsChange }: Sett
     stage.controlsManager.setPerpetualFov(newSettings.perpetualFov);
     stage.controls.rotateSpeed = newSettings.orbitSensitivity;
     stage.controls.zoomSpeed = newSettings.orbitSensitivity;
+    stage.setPanSpeed(newSettings.panSpeed);
     stage.grid.visible = newSettings.showGrid;
     stage.controlsManager.getCameraHelpers().forEach((h) => {
       h.visible = newSettings.showCameraGlyphs;
@@ -193,6 +194,25 @@ export function SettingsModal({ onClose, origin, stage, onSettingsChange }: Sett
               onChange={(e) => updateSetting('orbitSensitivity', parseFloat(e.target.value))}
               className="w-full h-1 bg-[#360403] rounded-lg appearance-none cursor-pointer accent-[#AE0D0A]"
             />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center justify-between text-[10px] font-bold text-[#F5F5F5]/80">
+              <span>WASD Pan Speed</span>
+              <span className="text-[#AE0D0A] font-extrabold">{settings.panSpeed.toFixed(1)} u/s</span>
+            </div>
+            <input
+              type="range"
+              min="0.5"
+              max="8"
+              step="0.5"
+              value={settings.panSpeed}
+              onChange={(e) => updateSetting('panSpeed', parseFloat(e.target.value))}
+              className="w-full h-1 bg-[#360403] rounded-lg appearance-none cursor-pointer accent-[#AE0D0A]"
+            />
+            <p className="text-[8px] font-bold uppercase tracking-widest text-[#F5F5F5]/30 leading-none select-none">
+              WASD pan · Shift/Space down/up · RMB menu
+            </p>
           </div>
 
           <div className="flex flex-col gap-2 pt-1 border-t border-[#730907]/40">

@@ -1,7 +1,6 @@
 import * as THREE from 'three';
-import { LightItem, LightType, LightingStyle } from '../../types';
+import { LightItem, LightType } from '../../types';
 import { createLightGlyph } from './lightGlyphs';
-import { applyLightingStyle } from './lightingStyles';
 
 export interface ManagedLight {
   id: string;
@@ -24,8 +23,7 @@ export interface LightingManager {
   setLightColor: (id: string, hexColor: string) => void;
   toggleLightShadow: (id: string) => void;
   toggleLightVisibility: (id: string) => void;
-  getStyle: () => LightingStyle;
-  setStyle: (style: LightingStyle) => void;
+  updateGlyphScale: (camera: THREE.Camera) => void;
   getRaycastTargets: () => THREE.Object3D[];
   getLightGroupById: (id: string) => THREE.Group | null;
   getGlyphs: () => THREE.Object3D[];
@@ -40,13 +38,9 @@ export interface LightingManager {
   destroy: () => void;
 }
 
-export function createLightingManager(
-  scene: THREE.Scene,
-  renderer: THREE.WebGLRenderer
-): LightingManager {
+export function createLightingManager(scene: THREE.Scene): LightingManager {
   const lights: ManagedLight[] = [];
   let activeLightId: string | null = null;
-  let currentStyle: LightingStyle = 'realistic';
   let onChangeCb: ((lights: LightItem[], activeId: string | null) => void) | null = null;
   let onSelectionCb: ((activeId: string | null) => void) | null = null;
 
@@ -91,7 +85,8 @@ export function createLightingManager(
     colorHex: number,
     intensity: number,
     pos: [number, number, number],
-    castShadow = false
+    castShadow = true,
+    shadowMapSize = 2048
   ) {
     const id = `light_${name.toLowerCase().replace(/\s+/g, '_')}`;
     const group = new THREE.Group();
@@ -103,11 +98,13 @@ export function createLightingManager(
       const dirLight = new THREE.DirectionalLight(colorHex, intensity);
       if (castShadow) {
         dirLight.castShadow = true;
-        dirLight.shadow.mapSize.width = 2048;
-        dirLight.shadow.mapSize.height = 2048;
+        dirLight.shadow.mapSize.width = shadowMapSize;
+        dirLight.shadow.mapSize.height = shadowMapSize;
         dirLight.shadow.camera.near = 0.5;
         dirLight.shadow.camera.far = 15;
         dirLight.shadow.bias = -0.0005;
+        // EDGE CASE: pure bias cannot fix acne on axis-aligned box faces; normalBias offsets along the normal instead
+        dirLight.shadow.normalBias = 0.02;
         const d = 2.5;
         dirLight.shadow.camera.left = -d;
         dirLight.shadow.camera.right = d;
@@ -116,7 +113,15 @@ export function createLightingManager(
       }
       light = dirLight;
     } else {
-      light = new THREE.PointLight(colorHex, intensity, 10, 2);
+      const pointLight = new THREE.PointLight(colorHex, intensity, 10, 2);
+      if (castShadow) {
+        pointLight.castShadow = true;
+        pointLight.shadow.mapSize.width = 512;
+        pointLight.shadow.mapSize.height = 512;
+        pointLight.shadow.bias = -0.005;
+        pointLight.shadow.normalBias = 0.02;
+      }
+      light = pointLight;
     }
 
     group.add(light);
@@ -144,9 +149,9 @@ export function createLightingManager(
     lights.push(managed);
   }
 
-  addInitialLight('Key Light', 'directional', 0xfff3e0, 2.2, [3, 4, 3], true);
-  addInitialLight('Fill Light', 'directional', 0xcfd8dc, 0.9, [-3, 2, 2], false);
-  addInitialLight('Rim Light', 'directional', 0x80d8ff, 2.6, [0, 3.5, -3.5], false);
+  addInitialLight('Key Light', 'directional', 0xfff3e0, 2.2, [3, 4, 3], true, 2048);
+  addInitialLight('Fill Light', 'directional', 0xcfd8dc, 0.9, [-3, 2, 2], true, 1024);
+  addInitialLight('Rim Light', 'directional', 0x80d8ff, 2.6, [0, 3.5, -3.5], true, 1024);
 
   const ambient = new THREE.AmbientLight(0xffffff, 0.45);
   scene.add(ambient);
@@ -227,10 +232,17 @@ export function createLightingManager(
     }
   }
 
-  function setStyle(style: LightingStyle) {
-    currentStyle = style;
-    applyLightingStyle(renderer, style);
-    notifyChange();
+  const glyphWorldPos = new THREE.Vector3();
+  function updateGlyphScale(camera: THREE.Camera) {
+    lights.forEach((l) => {
+      if (!l.visible) return;
+      l.group.getWorldPosition(glyphWorldPos);
+      const scale = Math.min(
+        2.4,
+        Math.max(0.55, camera.position.distanceTo(glyphWorldPos) * 0.045)
+      );
+      l.glyph.scale.setScalar(scale);
+    });
   }
 
   function getRaycastTargets(): THREE.Object3D[] {
@@ -262,8 +274,7 @@ export function createLightingManager(
     setLightColor,
     toggleLightShadow,
     toggleLightVisibility,
-    getStyle: () => currentStyle,
-    setStyle,
+    updateGlyphScale,
     getRaycastTargets,
     getLightGroupById: (id: string) => lights.find((l) => l.id === id)?.group || null,
     getGlyphs: () => lights.map((l) => l.glyph),
