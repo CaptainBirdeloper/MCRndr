@@ -135,6 +135,35 @@ export async function exportSinglePass(
   downloadDataUrl(dataUrl, `mc_${pass}_${resolution}_${time}.png`);
 }
 
+export const PASS_NAMES: Record<ShaderPassMode, string> = {
+  beauty: 'beauty',
+  wem: 'wem_mask',
+  normal: 'normal',
+  clown: 'clown_id',
+};
+
+/**
+ * Sequentially renders and downloads custom selected passes with identical camera matrix
+ */
+export async function exportSelectedPasses(
+  stage: SceneStage,
+  passes: ShaderPassMode[],
+  resolution: ExportResolution = '1080p',
+  transparentBg = true,
+  targetCamera?: THREE.PerspectiveCamera | null
+) {
+  if (passes.length === 0) return;
+  const time = Date.now().toString().slice(-4);
+
+  for (const passMode of passes) {
+    const filename = PASS_NAMES[passMode] || passMode;
+    const dataUrl = await capturePassImage(stage, passMode, resolution, transparentBg, targetCamera);
+    downloadDataUrl(dataUrl, `mc_${filename}_${resolution}_${time}.png`);
+    // Brief delay to allow browser download queue to process cleanly
+    await new Promise((r) => setTimeout(r, 180));
+  }
+}
+
 /**
  * Sequentially renders and downloads all 4 passes with identical camera matrix
  */
@@ -144,21 +173,5 @@ export async function exportAllPasses(
   transparentBg = true,
   targetCamera?: THREE.PerspectiveCamera | null
 ) {
-  const passes: { mode: ShaderPassMode; name: string }[] = [
-    { mode: 'beauty', name: 'beauty' },
-    { mode: 'wem', name: 'wem_mask' },
-    { mode: 'normal', name: 'normal' },
-    { mode: 'clown', name: 'clown_id' },
-  ];
-
-  // EDGE CASE: 4-digit timestamp slice easily collides across batch exports, overwriting files with identical timestamps
-  const time = Date.now().toString().slice(-4);
-
-  // EDGE CASE: exception in intermediate pass halts loop without cleanup, leaving remaining passes un-exported
-  for (const p of passes) {
-    const dataUrl = await capturePassImage(stage, p.mode, resolution, transparentBg, targetCamera);
-    downloadDataUrl(dataUrl, `mc_${p.name}_${resolution}_${time}.png`);
-    // Brief delay to allow browser download queue to process cleanly
-    await new Promise((r) => setTimeout(r, 180));
-  }
+  return exportSelectedPasses(stage, ['beauty', 'wem', 'normal', 'clown'], resolution, transparentBg, targetCamera);
 }

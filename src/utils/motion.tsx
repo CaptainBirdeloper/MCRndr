@@ -1,92 +1,37 @@
-import React, { useMemo } from 'react';
+import type { Transition } from 'motion/react';
 
 /**
- * Apple-calibrated fluid animation easing curves
+ * Official Apple WWDC Spring Presets calibrated via Motion 14.10.1
+ * Every motion = visualDuration + bounce (-1..1, 0 = no overshoot).
  */
-export const CURVES = {
-  spring: 'cubic-bezier(0.16, 1, 0.3, 1)',    // Apple iOS signature fluid spring
-  snappy: 'cubic-bezier(0.25, 1, 0.5, 1)',     // Instant responsive UI tap / toggle
-  smooth: 'cubic-bezier(0.4, 0, 0.2, 1)',      // Continuous layout morphing
-  bounce: 'cubic-bezier(0.34, 1.56, 0.64, 1)', // Tactile micro-overshoot bounce
-  soft: 'cubic-bezier(0.25, 0.1, 0.25, 1)',    // Gentle fade
-} as const;
+export const REDUCED: Transition = { duration: 0.15 };
 
-export type EasingCurve = keyof typeof CURVES;
+export const SMOOTH: Transition = {
+  type: 'spring',
+  visualDuration: 0.5,
+  bounce: 0,
+};
 
-export interface AnimateProps {
-  show?: boolean;
-  from: React.CSSProperties;
-  to: React.CSSProperties;
-  curve?: EasingCurve;
-  duration?: number; // milliseconds
-  delay?: number;
-  className?: string;
-  children: React.ReactNode;
-}
+export const SNAPPY: Transition = {
+  type: 'spring',
+  visualDuration: 0.5,
+  bounce: 0.15,
+};
 
-/**
- * Declarative component for quick starting state -> ending state fluid animations.
- * Example:
- * <Animate
- *   show={isOpen}
- *   from={{ opacity: 0, transform: 'scale(0.92) translateY(12px)' }}
- *   to={{ opacity: 1, transform: 'scale(1) translateY(0px)' }}
- *   curve="spring"
- *   duration={300}
- * >
- *   <MyModal />
- * </Animate>
- */
-export function Animate({
-  show = true,
-  from,
-  to,
-  curve = 'spring',
-  duration = 300,
-  delay = 0,
-  className = '',
-  children,
-}: AnimateProps) {
-  const currentStyle = useMemo<React.CSSProperties>(() => {
-    const targetState = show ? to : from;
-    const easing = CURVES[curve];
-    return {
-      ...targetState,
-      transition: `all ${duration}ms ${easing} ${delay}ms`,
-      willChange: 'transform, opacity',
-    };
-  }, [show, from, to, curve, duration, delay]);
+export const BOUNCY: Transition = {
+  type: 'spring',
+  visualDuration: 0.5,
+  bounce: 0.3,
+};
 
-  return (
-    <div style={currentStyle} className={className}>
-      {children}
-    </div>
-  );
-}
+export const PRESS_DOWN: Transition = {
+  type: 'spring',
+  visualDuration: 0.16,
+  bounce: 0,
+};
 
-/**
- * Imperative one-liner for animating any raw HTML element with preset curves.
- * Example:
- * animate(myButton, { transform: 'scale(1)' }, { transform: 'scale(1.08)' }, { curve: 'bounce', duration: 180 });
- */
-export function animate(
-  element: HTMLElement | null,
-  from: Keyframe,
-  to: Keyframe,
-  options?: {
-    curve?: EasingCurve;
-    duration?: number;
-    delay?: number;
-    fill?: FillMode;
-  }
-): Animation | null {
-  if (!element) return null;
-  const easing = CURVES[options?.curve ?? 'spring'];
-  // EDGE CASE: element.animate may be undefined in environments lacking Web Animations API support (e.g. JSDOM), throwing TypeError
-  return element.animate([from, to], {
-    duration: options?.duration ?? 300,
-    delay: options?.delay ?? 0,
-    easing,
-    fill: options?.fill ?? 'forwards',
-  });
-}
+export const PRESS_UP: Transition = {
+  type: 'spring',
+  visualDuration: 0.45,
+  bounce: 0.55,
+};

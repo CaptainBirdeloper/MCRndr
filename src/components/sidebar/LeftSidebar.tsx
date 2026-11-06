@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
+import { motion } from 'motion/react';
 import { SceneStage } from '../../engine/render/scene';
 import { BodyPartName } from '../../types';
 import { TransformCard } from './TransformCard';
 import { CameraCard } from './CameraCard';
 import { LightingCard } from './LightingCard';
 import { Upload, Image as ImageIcon, Settings } from 'lucide-react';
+import { SMOOTH, SNAPPY, PRESS_DOWN } from '../../utils/motion';
 
 interface LeftSidebarProps {
   stage: SceneStage | null;
@@ -168,22 +170,23 @@ export function LeftSidebar({
         onChange={handleFileUpload}
       />
 
-      <aside
-        className={`absolute left-0 top-0 bottom-0 z-40 w-[214px] bg-[#360403] transition-transform duration-350 ease-spring flex flex-col justify-between select-none font-['Rethink_Sans'] border-0 shadow-none overflow-y-auto custom-deck-scrollbar ${
-          isCollapsed ? '-translate-x-full' : 'translate-x-0'
-        }`}
+      <motion.aside
+        animate={{ x: isCollapsed ? -214 : 0 }}
+        transition={SMOOTH}
+        className="absolute left-0 top-0 bottom-0 z-40 w-[214px] bg-[#360403] flex flex-col justify-between select-none font-['Rethink_Sans'] border-0 shadow-none overflow-y-auto custom-deck-scrollbar"
       >
         <div className="flex flex-col">
           <div className="relative w-full h-[26px] bg-[#730907] p-[3px] flex items-center">
-            <div
-              className="absolute top-[3px] bottom-[3px] rounded-full bg-[#AE0D0A] transition-transform duration-300 ease-spring pointer-events-none"
+            <motion.div
+              className="absolute top-[3px] bottom-[3px] rounded-full bg-[#AE0D0A] pointer-events-none"
               style={{
                 width: 'calc((100% - 6px) / 3)',
                 left: '3px',
-                transform: `translateX(${
-                  activeTab === 'BODY' ? '0%' : activeTab === 'POSE' ? '100%' : '200%'
-                })`,
               }}
+              animate={{
+                x: activeTab === 'BODY' ? '0%' : activeTab === 'POSE' ? '100%' : '200%',
+              }}
+              transition={SNAPPY}
             />
 
             <button
@@ -240,7 +243,9 @@ export function LeftSidebar({
 
         <div className="w-full flex flex-col gap-1.5 pb-2.5">
           <div className="w-full px-2.5 box-border">
-            <button
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              transition={PRESS_DOWN}
               ref={settingsBtnRef}
               type="button"
               onClick={(e) => {
@@ -250,27 +255,29 @@ export function LeftSidebar({
                   y: Math.round(rect.top + rect.height / 2),
                 });
               }}
-              className="w-full h-[24px] rounded-[12px] bg-[#07050F] hover:bg-[#730907]/60 text-[#F5F5F5] font-bold text-[10px] uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 transition border-0 shadow-none"
+              className="w-full h-[24px] rounded-[12px] bg-[#07050F] hover:bg-[#730907]/60 text-[#F5F5F5] font-bold text-[10px] uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer transition-colors border-0 shadow-none"
             >
               <Settings className="w-3 h-3 text-[#AE0D0A] pointer-events-none" />
               <span className="pointer-events-none select-none">Settings</span>
-            </button>
+            </motion.button>
           </div>
 
           <div className="w-full px-2.5 flex items-center gap-2 overflow-hidden box-border">
             {!skinName ? (
-              <button
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                transition={PRESS_DOWN}
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="flex-1 min-w-0 h-[24px] rounded-full bg-[#07050F] hover:bg-black/80 text-white font-bold text-[10px] flex items-center justify-center gap-1 cursor-pointer active:scale-95 transition border-0 shadow-none px-2.5"
+                className="flex-1 min-w-0 h-[24px] rounded-full bg-[#07050F] hover:bg-black/80 text-white font-bold text-[10px] flex items-center justify-center gap-1 cursor-pointer transition-colors border-0 shadow-none px-2.5"
               >
                 <Upload className="w-3 h-3 shrink-0" />
                 <span className="leading-none whitespace-nowrap">Import skin</span>
-              </button>
+              </motion.button>
             ) : (
               <div
                 onClick={() => fileInputRef.current?.click()}
-                className="flex-1 min-w-0 h-[24px] px-2.5 rounded-full bg-[#07050F] text-white flex items-center gap-1 cursor-pointer active:scale-95 transition border-0 shadow-none"
+                className="flex-1 min-w-0 h-[24px] px-2.5 rounded-full bg-[#07050F] text-white flex items-center gap-1 cursor-pointer transition-colors border-0 shadow-none"
               >
                 <ImageIcon className="w-3 h-3 text-[#AE0D0A] shrink-0" />
                 <span className="text-[10px] font-bold truncate">
@@ -279,29 +286,32 @@ export function LeftSidebar({
               </div>
             )}
 
-            <button
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              transition={PRESS_DOWN}
               type="button"
               onClick={onOpenExport}
-              className="w-[68px] shrink-0 h-[24px] rounded-[12px] bg-[#730907] hover:bg-[#AE0D0A] text-[#F5F5F5] font-semibold text-[11px] flex items-center justify-center cursor-pointer active:scale-95 transition border-0 shadow-none leading-none whitespace-nowrap tracking-tight"
+              className="w-[68px] shrink-0 h-[24px] rounded-[12px] bg-[#730907] hover:bg-[#AE0D0A] text-[#F5F5F5] font-semibold text-[11px] flex items-center justify-center cursor-pointer transition-colors border-0 shadow-none leading-none whitespace-nowrap tracking-tight"
             >
               Export
-            </button>
+            </motion.button>
           </div>
         </div>
-      </aside>
+      </motion.aside>
 
-      <button
+      <motion.button
+        animate={{ left: isCollapsed ? 0 : 214 }}
+        transition={SMOOTH}
+        whileTap={{ scale: 0.92 }}
         type="button"
         onClick={onToggleCollapse}
         title={isCollapsed ? 'Expand panel' : 'Collapse panel'}
-        className={`absolute top-1/2 -translate-y-1/2 z-50 w-[11px] h-[20px] bg-[#AE0D0A] hover:bg-[#c9120e] rounded-r-md flex items-center justify-center text-white cursor-pointer transition-all duration-350 ease-spring border-0 shadow-none ${
-          isCollapsed ? 'left-0' : 'left-[214px]'
-        }`}
+        className="absolute top-1/2 -translate-y-1/2 z-50 w-[11px] h-[20px] bg-[#AE0D0A] hover:bg-[#c9120e] rounded-r-md flex items-center justify-center text-white cursor-pointer transition-colors border-0 shadow-none"
       >
         <span className="text-[9px] font-bold leading-none select-none">
           {isCollapsed ? '›' : '‹'}
         </span>
-      </button>
+      </motion.button>
     </>
   );
 }

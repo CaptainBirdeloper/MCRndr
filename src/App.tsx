@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { AnimatePresence, MotionConfig } from 'motion/react';
 import { Viewport } from './components/Viewport';
 import { LeftSidebar } from './components/sidebar/LeftSidebar';
 import { CameraDropdown } from './components/camera/CameraDropdown';
@@ -120,70 +121,80 @@ export function App() {
   };
 
   return (
-    <div className="relative w-screen h-screen bg-[#07050F] text-white font-['Rethink_Sans'] select-none overflow-hidden">
-      <main className="w-full h-full absolute inset-0">
-        <Viewport
-          onStageReady={setStage}
-          onSkinLoaded={handleSkinLoaded}
-          onSelectionChange={(part, deg) => {
-            setSelectedPart(part);
-            setRotationDeg(deg);
-          }}
-        />
-      </main>
-
-      {showHUD && (
-        <div
-          style={{ zoom: `${uiZoom}%` }}
-          className="absolute inset-0 pointer-events-none z-40 [&>*]:pointer-events-auto"
-        >
-          <CameraDropdown stage={stage} />
-
-          <LeftSidebar
-            stage={stage}
-            skinName={skinName}
-            activePoseId={activePoseId}
-            selectedPart={selectedPart}
-            onPoseSelect={handlePoseSelect}
+    <MotionConfig reducedMotion="user">
+      <div className="relative w-screen h-screen bg-[#07050F] text-white font-['Rethink_Sans'] select-none overflow-hidden">
+        <main className="w-full h-full absolute inset-0">
+          <Viewport
+            onStageReady={setStage}
             onSkinLoaded={handleSkinLoaded}
-            onOpenExport={() => setShowExportModal(true)}
-            onOpenSettings={(origin) => {
-              setSettingsOrigin(origin);
-              setShowSettingsModal(true);
+            onSelectionChange={(part, deg) => {
+              setSelectedPart(part);
+              setRotationDeg(deg);
             }}
-            isCollapsed={isSidebarCollapsed}
-            onToggleCollapse={() => setIsSidebarCollapsed((prev) => !prev)}
           />
-        </div>
-      )}
+        </main>
 
-      {showExportModal && (
-        <ExportModal
-          stage={stage}
-          activePass={shaderPass}
-          onClose={() => setShowExportModal(false)}
-        />
-      )}
+        {showHUD && (
+          <div
+            style={{ zoom: `${uiZoom}%` }}
+            className="absolute inset-0 pointer-events-none z-40 [&>*]:pointer-events-auto"
+          >
+            <CameraDropdown stage={stage} />
 
-      {activeLight && lightScreenPos && (
-        <FloatingLightModal
-          light={activeLight}
-          position={lightScreenPos}
-          onIntensityChange={(id, val) => stage?.lightingManager.setLightIntensity(id, val)}
-          onColorChange={(id, color) => stage?.lightingManager.setLightColor(id, color)}
-          onToggleShadow={(id) => stage?.lightingManager.toggleLightShadow(id)}
-          onClose={() => stage?.lightingManager.selectLight(null)}
-        />
-      )}
+            <LeftSidebar
+              stage={stage}
+              skinName={skinName}
+              activePoseId={activePoseId}
+              selectedPart={selectedPart}
+              onPoseSelect={handlePoseSelect}
+              onSkinLoaded={handleSkinLoaded}
+              onOpenExport={() => setShowExportModal(true)}
+              onOpenSettings={(origin) => {
+                setSettingsOrigin(origin);
+                setShowSettingsModal(true);
+              }}
+              isCollapsed={isSidebarCollapsed}
+              onToggleCollapse={() => setIsSidebarCollapsed((prev) => !prev)}
+            />
+          </div>
+        )}
 
-      <SettingsModal
-        isOpen={showSettingsModal}
-        onClose={() => setShowSettingsModal(false)}
-        origin={settingsOrigin}
-        stage={stage}
-        onSettingsChange={(s) => setUiZoom(s.uiZoom)}
-      />
-    </div>
+        <AnimatePresence>
+          {showExportModal && (
+            <ExportModal
+              key="export-modal"
+              stage={stage}
+              activePass={shaderPass}
+              onClose={() => setShowExportModal(false)}
+            />
+          )}
+        </AnimatePresence>
+
+        {activeLight && lightScreenPos && (
+          <FloatingLightModal
+            light={activeLight}
+            position={lightScreenPos}
+            onIntensityChange={(id, val) => stage?.lightingManager.setLightIntensity(id, val)}
+            onColorChange={(id, color) => stage?.lightingManager.setLightColor(id, color)}
+            onToggleShadow={(id) => stage?.lightingManager.toggleLightShadow(id)}
+            onClose={() => stage?.lightingManager.selectLight(null)}
+          />
+        )}
+
+        <AnimatePresence>
+          {showSettingsModal && (
+            <SettingsModal
+              key="settings-modal"
+              isOpen={showSettingsModal}
+              onClose={() => setShowSettingsModal(false)}
+              origin={settingsOrigin}
+              stage={stage}
+              onSettingsChange={(s) => setUiZoom(s.uiZoom)}
+            />
+          )}
+        </AnimatePresence>
+      </div>
+    </MotionConfig>
   );
 }
 

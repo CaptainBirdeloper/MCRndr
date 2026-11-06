@@ -1,9 +1,19 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { SceneStage } from '../../engine/render/scene';
-import { exportSinglePass, exportAllPasses, ExportResolution, RESOLUTIONS } from '../../engine/render/exporter';
+import {
+  exportSinglePass,
+  exportSelectedPasses,
+  ExportResolution,
+} from '../../engine/render/exporter';
 import { ShaderPassMode } from '../../types';
-import { Animate } from '../../utils/motion';
-import { Download, Layers, X } from 'lucide-react';
+import { X, Check, ChevronDown } from 'lucide-react';
+import { SMOOTH, SNAPPY, PRESS_DOWN, PRESS_UP } from '../../utils/motion';
+
+import passBeauty from '../../assets/passes/pass-beauty.png';
+import passWem from '../../assets/passes/pass-wem-mask.png';
+import passNormal from '../../assets/passes/pass-normal.png';
+import passClown from '../../assets/passes/pass-clown-id.png';
 
 interface ExportModalProps {
   stage: SceneStage | null;
@@ -11,170 +21,283 @@ interface ExportModalProps {
   onClose: () => void;
 }
 
+interface PassCardConfig {
+  id: ShaderPassMode;
+  label: string;
+  image: string;
+}
+
+const PASS_CARDS: PassCardConfig[] = [
+  { id: 'beauty', label: 'beauty', image: passBeauty },
+  { id: 'wem', label: 'wem', image: passWem },
+  { id: 'normal', label: 'normal', image: passNormal },
+  { id: 'clown', label: 'clown', image: passClown },
+];
+
 export function ExportModal({ stage, activePass, onClose }: ExportModalProps) {
   const [resolution, setResolution] = useState<ExportResolution>('1080p');
-  const [transparent, setTransparent] = useState<boolean>(true);
-  const [isExporting, setIsExporting] = useState<boolean>(false);
+  const [selectedPasses, setSelectedPasses] = useState<ShaderPassMode[]>([activePass || 'beauty']);
+  const [isCamOpen, setIsCamOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [showTick, setShowTick] = useState(false);
 
   const cameras = stage ? stage.controlsManager.getCameras() : [];
   const initialCamId = stage?.controlsManager.getActiveCameraId() || 'viewport';
   const [selectedCamId, setSelectedCamId] = useState<string>(initialCamId);
+
+  const camContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (camContainerRef.current && !camContainerRef.current.contains(e.target as Node)) {
+        setIsCamOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const togglePass = (passId: ShaderPassMode) => {
+    setSelectedPasses((prev) => {
+      if (prev.includes(passId)) {
+        return prev.length > 1 ? prev.filter((p) => p !== passId) : prev;
+      }
+      return [...prev, passId];
+    });
+  };
 
   const getTargetCamera = () => {
     if (!stage || selectedCamId === 'viewport') return null;
     return stage.controlsManager.getCameraById(selectedCamId);
   };
 
-  const runExport = async (action: () => Promise<void>) => {
-    if (!stage || isExporting) return;
+  const runExport = async () => {
+    if (!stage || isExporting || selectedPasses.length === 0) return;
     setIsExporting(true);
     try {
-      // EDGE CASE: missing catch block leaves export errors (e.g. canvas security taint, WebGL context loss) unhandled with no user notification
-      await action();
+      const targetCam = getTargetCamera();
+      if (selectedPasses.length === 1) {
+        await exportSinglePass(stage, selectedPasses[0], resolution, true, targetCam);
+      } else {
+        await exportSelectedPasses(stage, selectedPasses, resolution, true, targetCam);
+      }
+      setShowTick(true);
+      setTimeout(() => {
+        setShowTick(false);
+      }, 1400);
+    } catch (err) {
+      console.error(err);
     } finally {
       setIsExporting(false);
     }
   };
 
-  const handleSingleExport = () =>
-    runExport(() => exportSinglePass(stage!, activePass, resolution, transparent, getTargetCamera()));
-
-  const handleAllExport = () =>
-    runExport(() => exportAllPasses(stage!, resolution, transparent, getTargetCamera()));
+  const getCamLabel = () => {
+    if (selectedCamId === 'viewport') return 'viewport';
+    const found = cameras.find((c) => c.id === selectedCamId);
+    return found ? (found.name || found.id).toLowerCase() : selectedCamId.toLowerCase();
+  };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 transition-opacity duration-200 ease-smooth">
-      <Animate
-        show={true}
-        from={{ opacity: 0, transform: 'scale(0.92) translateY(18px)' }}
-        to={{ opacity: 1, transform: 'scale(1) translateY(0px)' }}
-        curve="spring"
-        duration={300}
-        className="w-full max-w-sm"
-      >
-        <div className="relative w-full bg-[#07050F] border border-[#740907] rounded-2xl p-5 shadow-2xl flex flex-col gap-4 text-[#F5F5F5]">
-        <div className="flex items-center justify-between pb-2 border-b border-[#740907]/60">
-          <div className="flex items-center gap-2">
-            <Download className="w-4 h-4 text-[#AE0D0A]" />
-            <h2 className="text-sm font-bold tracking-wide text-white font-['Rethink_Sans']">
-              4K Export Engine
-            </h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-1 rounded-lg hover:bg-[#740907] text-zinc-400 hover:text-white transition cursor-pointer active:scale-[0.92] ease-snappy"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={SMOOTH}
+      className="fixed inset-0 z-50 bg-[#000000] text-[#F5F5F5] w-screen h-screen overflow-hidden flex flex-col justify-between p-8 sm:p-10 select-none font-['Rethink_Sans'] font-bold"
+    >
+      {/* TOP BAR */}
+      <header className="w-full flex items-center justify-between">
+        <h1 className="text-sm font-black tracking-[0.22em] uppercase text-white pl-1">
+          EXPORT
+        </h1>
 
-        <div className="flex flex-col gap-1.5">
-          <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider font-['Rethink_Sans']">
-            Resolution
-          </label>
-          <div className="relative grid grid-cols-3 p-1 bg-[#120e24] rounded-xl border border-[#740907]/40">
-            <div
-              className="absolute top-1 bottom-1 left-1 w-[calc((100%-8px)/3)] bg-[#AE0D0A] rounded-lg transition-transform duration-250 ease-spring pointer-events-none"
-              style={{
-                transform:
-                  resolution === '1080p'
-                    ? 'translateX(0%)'
-                    : resolution === '2k'
-                    ? 'translateX(100%)'
-                    : 'translateX(200%)',
-              }}
-            />
-            {(Object.keys(RESOLUTIONS) as ExportResolution[]).map((res) => {
-              const isActive = resolution === res;
-              return (
-                <button
-                  key={res}
-                  onClick={() => setResolution(res)}
-                  className={`relative z-10 py-2 px-1 rounded-lg text-xs font-medium transition-all duration-150 ease-spring text-center cursor-pointer select-none active:scale-[0.96] ease-snappy ${
-                    isActive ? 'text-[#F5F5F5]' : 'text-zinc-400 hover:text-zinc-200'
+        <motion.button
+          whileTap={{ scale: 0.92 }}
+          transition={PRESS_DOWN}
+          onClick={onClose}
+          title="Close (Esc)"
+          className="w-7 h-7 rounded-full bg-[#140303] hover:bg-[#250505] text-zinc-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer border-0 shadow-none"
+        >
+          <X className="w-3.5 h-3.5" />
+        </motion.button>
+      </header>
+
+      {/* CENTER: 4 TALL CARDS */}
+      <main className="w-full flex-1 flex items-center justify-center my-auto px-2">
+        <div className="grid grid-cols-4 gap-6 w-full max-w-6xl h-[calc(100vh-170px)] max-h-[560px]">
+          {PASS_CARDS.map((card) => {
+            const isSelected = selectedPasses.includes(card.id);
+            return (
+              <div
+                key={card.id}
+                onClick={() => togglePass(card.id)}
+                className={`relative rounded-[28px] bg-[#000000] border flex flex-col items-center justify-between p-3 pb-5 cursor-pointer select-none transition-colors duration-150 ${
+                  isSelected
+                    ? 'border-[#360403]'
+                    : 'border-[#1b0202] hover:border-[#2d0505] hover:bg-[#080202]'
+                }`}
+              >
+                {/* Preview Frame with Inner Shadow / Selection Outline */}
+                <div
+                  className={`w-full flex-1 rounded-[22px] flex items-center justify-center overflow-hidden my-auto p-4 transition-colors duration-150 ${
+                    isSelected
+                      ? 'border border-[#AE0D0A] shadow-[inset_0_0_24px_rgba(174,13,10,0.25)]'
+                      : 'border border-transparent'
                   }`}
                 >
-                  <div className="font-bold">{res.toUpperCase()}</div>
-                  <div className="text-[10px] opacity-80">{RESOLUTIONS[res].width}×{RESOLUTIONS[res].height}</div>
-                </button>
-              );
-            })}
-          </div>
+                  <img
+                    src={card.image}
+                    alt={`${card.label} pass`}
+                    className={`w-full h-full object-contain transition-opacity duration-150 pointer-events-none ${
+                      isSelected ? 'opacity-100' : 'opacity-40'
+                    }`}
+                  />
+                </div>
+
+                {/* Flat Pill Badge */}
+                <div
+                  className={`px-8 py-2 rounded-full text-xs tracking-wide lowercase transition-colors duration-150 border-0 shadow-none ${
+                    isSelected
+                      ? 'bg-[#730907] text-white'
+                      : 'bg-[#360403] text-zinc-400'
+                  }`}
+                >
+                  {card.label}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </main>
+
+      {/* BOTTOM BAR: 100% FLAT SOLID ELEMENTS */}
+      <footer className="w-full flex items-center justify-between">
+        {/* Left: Resolution Pill Segmented Group (Solid Flat) */}
+        <div className="relative flex items-center bg-[#360403] rounded-full p-1 border-0 shadow-none">
+          <motion.div
+            className="absolute top-1 bottom-1 left-1 w-[88px] bg-[#730907] rounded-full pointer-events-none"
+            animate={{
+              x:
+                resolution === '1080p'
+                  ? 0
+                  : resolution === '2k'
+                  ? 88
+                  : 176,
+            }}
+            transition={SNAPPY}
+          />
+          <button
+            onClick={() => setResolution('1080p')}
+            className={`relative z-10 w-[88px] py-2 text-center text-xs cursor-pointer transition-colors border-0 shadow-none ${
+              resolution === '1080p' ? 'text-white' : 'text-zinc-300 hover:text-white'
+            }`}
+          >
+            1080p
+          </button>
+          <button
+            onClick={() => setResolution('2k')}
+            className={`relative z-10 w-[88px] py-2 text-center text-xs cursor-pointer transition-colors border-0 shadow-none ${
+              resolution === '2k' ? 'text-white' : 'text-zinc-300 hover:text-white'
+            }`}
+          >
+            2k
+          </button>
+          <button
+            onClick={() => setResolution('4k')}
+            className={`relative z-10 w-[88px] py-2 text-center text-xs cursor-pointer transition-colors border-0 shadow-none ${
+              resolution === '4k' ? 'text-white' : 'text-zinc-300 hover:text-white'
+            }`}
+          >
+            4k
+          </button>
         </div>
 
-        <div className="flex flex-col gap-1.5">
-          <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider font-['Rethink_Sans']">
-            Camera View
-          </label>
-          <div className="relative">
-            <select
-              value={selectedCamId}
-              onChange={(e) => setSelectedCamId(e.target.value)}
-              className="w-full py-2.5 px-3 rounded-xl bg-[#120e24] border border-[#740907]/40 text-xs text-[#F5F5F5] font-bold focus:outline-none focus:border-[#AE0D0A] transition cursor-pointer font-['Rethink_Sans'] appearance-none pr-8"
+        {/* Right: Camera Dropdown & Export Button (Solid Flat) */}
+        <div className="flex items-center gap-4">
+          <div ref={camContainerRef} className="relative">
+            <motion.button
+              whileTap={{ scale: 0.96 }}
+              transition={PRESS_DOWN}
+              onClick={() => setIsCamOpen((prev) => !prev)}
+              className="flex items-center gap-3 px-6 py-2.5 rounded-full bg-[#360403] hover:bg-[#4a0604] text-xs text-white transition-colors cursor-pointer border-0 shadow-none"
             >
-              <option value="viewport" className="bg-[#07050F] text-[#F5F5F5]">
-                Current Viewport
-              </option>
-              {cameras.map((c) => (
-                // EDGE CASE: c.name being undefined or empty will throw TypeError on charAt
-                <option key={c.id} value={c.id} className="bg-[#07050F] text-[#F5F5F5]">
-                  {c.name.charAt(0).toUpperCase() + c.name.slice(1)}
-                </option>
-              ))}
-            </select>
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-400">
-              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <path d="M6 9l6 6 6-6" />
-              </svg>
-            </div>
+              <span className="lowercase font-bold">{getCamLabel()}</span>
+              <ChevronDown className="w-3.5 h-3.5 text-zinc-300 stroke-[2.5]" />
+            </motion.button>
+
+            <AnimatePresence>
+              {isCamOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                  transition={SNAPPY}
+                  className="absolute right-0 bottom-full mb-2 w-48 rounded-2xl bg-[#140303] border border-[#360403] p-1.5 shadow-2xl flex flex-col gap-1 z-30"
+                >
+                  <button
+                    onClick={() => {
+                      setSelectedCamId('viewport');
+                      setIsCamOpen(false);
+                    }}
+                    className={`w-full text-left px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
+                      selectedCamId === 'viewport' ? 'bg-[#730907] text-white' : 'hover:bg-[#730907]/40 text-zinc-300'
+                    }`}
+                  >
+                    viewport
+                  </button>
+                  {cameras.map((cam) => {
+                    const isAct = selectedCamId === cam.id;
+                    const label = cam.name ? cam.name.toLowerCase() : cam.id.toLowerCase();
+                    return (
+                      <button
+                        key={cam.id}
+                        onClick={() => {
+                          setSelectedCamId(cam.id);
+                          setIsCamOpen(false);
+                        }}
+                        className={`w-full text-left px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
+                          isAct ? 'bg-[#730907] text-white' : 'hover:bg-[#730907]/40 text-zinc-300'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
-        </div>
 
-        <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#120e24] border border-[#740907]/40">
-          <span className="text-xs text-zinc-200 font-medium font-['Rethink_Sans']">
-            Transparent Alpha Background
-          </span>
-          <button
-            type="button"
-            onClick={() => setTransparent(!transparent)}
-            className={`w-10 h-6 rounded-full p-1 relative flex items-center transition-colors duration-250 ease-spring cursor-pointer active:scale-[0.92] ease-snappy ${
-              transparent ? 'bg-[#AE0D0A]' : 'bg-[#1a1435]'
-            }`}
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            transition={PRESS_UP}
+            onClick={runExport}
+            disabled={isExporting || selectedPasses.length === 0}
+            className="min-w-[120px] h-[38px] px-8 rounded-full bg-[#AE0D0A] hover:bg-[#cf100d] text-white text-xs tracking-wider uppercase transition-colors cursor-pointer flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed border-0 shadow-none"
           >
-            <div
-              className={`w-4 h-4 rounded-full bg-white transition-transform duration-250 ease-spring shadow-md ${
-                transparent ? 'translate-x-4' : 'translate-x-0'
-              }`}
-            />
-          </button>
+            {showTick ? (
+              <Check className="w-5 h-5 text-white stroke-[3] animate-in zoom-in-75 duration-150" />
+            ) : isExporting ? (
+              <span className="animate-pulse">...</span>
+            ) : (
+              <span>EXPORT</span>
+            )}
+          </motion.button>
         </div>
-
-        <div className="flex flex-col gap-2 pt-1">
-          <button
-            disabled={isExporting}
-            onClick={handleAllExport}
-            className={`w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-[#AE0D0A] hover:bg-[#cf100d] text-white font-bold text-xs transition cursor-pointer active:scale-[0.96] active:duration-100 ease-snappy disabled:opacity-50 font-['Rethink_Sans'] ${
-              isExporting ? 'animate-pulse' : ''
-            }`}
-          >
-            <Layers className={`w-4 h-4 ${isExporting ? 'animate-spin' : ''}`} />
-            <span>
-              {isExporting ? 'Rendering Passes...' : 'Export All 4 Passes (Beauty, WEM, Normal, Clown)'}
-            </span>
-          </button>
-
-          <button
-            disabled={isExporting}
-            onClick={handleSingleExport}
-            className={`w-full py-2 px-4 rounded-xl bg-[#120e24] hover:bg-[#1a1435] border border-[#740907]/50 text-zinc-300 hover:text-white font-semibold text-xs transition cursor-pointer active:scale-[0.96] active:duration-100 ease-snappy disabled:opacity-50 font-['Rethink_Sans'] ${
-              isExporting ? 'animate-pulse' : ''
-            }`}
-          >
-            Export Active Pass Only ({activePass.toUpperCase()})
-          </button>
-        </div>
-      </div>
-      </Animate>
-    </div>
+      </footer>
+    </motion.div>
   );
 }
+
+export default ExportModal;

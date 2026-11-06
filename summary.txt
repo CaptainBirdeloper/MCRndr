@@ -28,13 +28,14 @@ Generated: 2026-10-30 | Target: Zero-waste 1-to-2 turn LLM feature and fix execu
 1. DIRECTORY STRUCTURE & ACTIVE FILE ROLES
 --------------------------------------------------------------------------------
 index.html                           -> Entry HTML, dark AMOLED canvas (#000000), Google Fonts (Rethink Sans + Plus Jakarta Sans).
+launch.vbs                           -> Silent Windows launcher: runs dev server hidden (no CMD window) & opens browser.
 src\main.tsx                         -> React 19 root DOM mount into #root.
 src\App.tsx                          -> Shell (< 130 lines). Coordinates Viewport, LeftSidebar, CameraDropdown, ExportModal, SettingsModal.
 src\types.ts                         -> Core domain types (BodyPartName, ShaderPassMode, ArmType, LightType, LightingStyle, LightItem, CameraItem).
 src\index.css                        -> Tailwind v4 theme, font imports, :root variables, custom scrollbar tokens.
 src\presets\poses.ts                 -> Preset library: walking, running, pointing, showcasing.
 src\utils\settings.ts                -> User settings schema (uiZoom, perpetualFov, orbitSensitivity, showGrid, showCameraGlyphs) & storage.
-src\utils\motion.tsx                 -> Fluid animation engine: preset Apple curves (spring, snappy, bounce), <Animate />.
+src\utils\motion.tsx                 -> Apple WWDC fluid spring engine (motion@14.10.1): SMOOTH (.5/0), SNAPPY (.5/.15), BOUNCY (.5/.3), PRESS_DOWN/UP.
 
 [Components - Modular Folders]
 src\components\Viewport.tsx          -> Canvas container, drag-and-drop .png skin handler, single-mount useEffect with callback locks.
@@ -43,7 +44,7 @@ src\components\sidebar\TransformCard.tsx -> 3-axis unified input card for transl
 src\components\sidebar\PosePresets.tsx   -> 2-column preset grid with AutoFitText and add preset trigger.
 src\components\sidebar\CameraCard.tsx    -> Camera card for WORLD tab: CAMERA banner, active camera selector, per-camera FOV slider.
 src\components\sidebar\LightingCard.tsx  -> Lighting card for WORLD tab: style pill (Realistic vs Minecrafty), light list, intensity.
-src\components\modals\ExportModal.tsx    -> Modal dialog for 1080p/2K/4K resolution, camera view selection, alpha toggle, single & batch export.
+src\components\modals\ExportModal.tsx    -> Fullscreen cinematic studio modal: 4 tall pass cards (Beauty, WEM, Normals, Clown ID) with screenshot previews, inner shadow depth, 1080p/2K/4K segmented pill, camera dropdown, and tickmark export CTA.
 src\components\modals\SettingsModal.tsx  -> Settings modal dialog with dynamic button-origin spring translation (UI zoom 50-300%).
 src\components\modals\FloatingLightModal.tsx -> Screen-tracked floating modifier modal for active light intensity & quick controls.
 src\components\camera\CameraDropdown.tsx -> Top-right docked pill/menu for camera switching and selection.
@@ -52,7 +53,7 @@ src\components\common\AutoFitText.tsx    -> Auto-shrinking text container for co
 [Engine - Modular Subsystems]
 src\engine\render\scene.ts           -> Three.js stage management (SceneStage), render loop, lightingManager integration, cleanup.
 src\engine\render\shaders.ts         -> Custom GLSL ShaderMaterials: WEMPassMaterial, NormalPassMaterial, ClownIDPassMaterial.
-src\engine\render\exporter.ts        -> Offscreen multi-res render pipeline (1080p, 2K, 4K), PNG download, batch zip export.
+src\engine\render\exporter.ts        -> Offscreen multi-res render pipeline (1080p, 2K, 4K), PNG download, exportSelectedPasses / exportAllPasses / exportSinglePass.
 src\engine\rig\rig.ts                -> Dual-layer Steve (4px) and Alex (3px) Minecraft rig hierarchy, anatomical pivot anchors, box UVs.
 src\engine\rig\skin.ts               -> 64x64/64x32 skin UV unwrap, NearestFilter texture, procedural default Steve, detectSkinModel.
 src\engine\camera\cameraManager.ts   -> Multi-camera lifecycle, FOV-invariant CameraHelper frustums, cubic ease-out lerp transitions.

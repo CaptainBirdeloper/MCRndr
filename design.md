@@ -104,4 +104,4 @@ Calibrated 1:1 to the official Lunacy design artboard (960×540 fixed canvas) an
   - High/custom FOV (10°–120°) is isolated to camera view (`activeCameraId !== null`) and offscreen export snapshots.
   - OrbitControls start event immediately restores free viewport perspective to default workspace `38°` FOV.
 * **Camera Dropdown**: Fixed at `top-3 right-6 z-40`, compact pill showing active camera index or `FREE VIEW`, quick cycle (`C`), and save camera (`Shift+C`).
-* **Export Modal**: Fixed center dialog with resolution pills (`1080p`, `2K`, `4K`), pass selector (`Beauty`, `WEM`, `Normal`, `Clown`), alpha transparency toggle, and multi-camera batch export.
+* **Export Modal**: Fullscreen cinematic studio modal with OLED black canvas (`#000000`), tactile inner-shadow depth, 4 tall preview cards (Beauty, WEM, Normals, Clown ID) with screenshot previews, segmented resolution pill (`1080p`, `2K`, `4K`), camera dropdown, and instant tickmark feedback on export.
