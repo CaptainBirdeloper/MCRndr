@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BodyPartName } from '../../types';
+import { BodyPartName, LightSpec } from '../../types';
 import { MinecraftRig } from '../rig/rig';
 
 export type HistoryAction =
@@ -43,12 +43,20 @@ export type HistoryAction =
       nextRotations: Record<string, [number, number, number]>;
       prevRootPos: [number, number, number];
       nextRootPos: [number, number, number];
+    }
+  | {
+      type: 'light_rig';
+      prev: LightSpec[];
+      next: LightSpec[];
+      prevExposure: number;
+      nextExposure: number;
     };
 
 export interface HistoryCallbacks {
   notifyRootTransform: () => void;
   notifyPartTransform: (part: BodyPartName) => void;
   notifyAngleChange: (part: BodyPartName) => void;
+  applyLightRig: (specs: LightSpec[], exposure: number) => void;
 }
 
 export interface HistoryManager {
@@ -60,6 +68,12 @@ export interface HistoryManager {
   commitRotationHistory: (axis: 'x' | 'y' | 'z', prev: number, next: number) => void;
   commitPartPositionHistory: (part: BodyPartName, axis: 'x' | 'y' | 'z', prev: number, next: number) => void;
   commitPartRotationHistory: (part: BodyPartName, axis: 'x' | 'y' | 'z', prev: number, next: number) => void;
+  commitLightHistory: (
+    prev: LightSpec[],
+    next: LightSpec[],
+    prevExposure: number,
+    nextExposure: number
+  ) => void;
   setOnTransformListener: (cb: () => void) => void;
   setOnUndoListener: (cb: () => void) => void;
 }
@@ -78,7 +92,7 @@ export function createHistoryManager(
     undoStack.push(action);
     if (undoStack.length > 50) undoStack.shift();
     redoStack.length = 0;
-    if (action.type !== 'pose') {
+    if (action.type !== 'pose' && action.type !== 'light_rig') {
       onTransformCb?.();
     }
   }
@@ -124,6 +138,16 @@ export function createHistoryManager(
       prev,
       next,
     });
+  }
+
+  function commitLightHistory(
+    prev: LightSpec[],
+    next: LightSpec[],
+    prevExposure: number,
+    nextExposure: number
+  ) {
+    if (prevExposure === nextExposure && JSON.stringify(prev) === JSON.stringify(next)) return;
+    pushAction({ type: 'light_rig', prev, next, prevExposure, nextExposure });
   }
 
   function applyHistoryAction(action: HistoryAction, direction: 'prev' | 'next') {
@@ -182,6 +206,10 @@ export function createHistoryManager(
       rig.root.position.set(...rootPos);
       boxHelper.setFromObject(rig.root);
       callbacks.notifyRootTransform();
+    } else if (action.type === 'light_rig') {
+      const specs = direction === 'prev' ? action.prev : action.next;
+      const exposure = direction === 'prev' ? action.prevExposure : action.nextExposure;
+      callbacks.applyLightRig(specs, exposure);
     }
   }
 
@@ -214,6 +242,7 @@ export function createHistoryManager(
     commitRotationHistory,
     commitPartPositionHistory,
     commitPartRotationHistory,
+    commitLightHistory,
     setOnTransformListener: (cb: () => void) => {
       onTransformCb = cb;
     },

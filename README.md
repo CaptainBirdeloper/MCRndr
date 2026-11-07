@@ -42,9 +42,12 @@ MCRndr exports transparent PNGs up to 4K resolution. Instead of just a flat pict
 
 - Drag & Drop Any Skin: Drop your .png skin directly into the window. MCRndr automatically detects classic 4px Steve arms or 3px slim Alex arms, plus jackets, hats, and outer 3D layers.
 - Simple Limb Posing: Click limbs to rotate and translate them. Use preset buttons (Running, Walking, Pointing) for quick starts, or hotkeys (G to move, R to rotate).
-- Unlimited Undo: Hit Ctrl+Z anytime. 60 steps of history keep your posing stress-free.
-- Dynamic Lighting: Click and drag sun and point lights in 3D space. Switch between realistic soft shadows or authentic in-game blocky lighting.
+- Multiple Players: Right-click the canvas and choose "+ Add Player" to stage a second character, then left-click any character to make it active. Each player keeps its own pose, transforms, and undo history.
+- Unlimited Undo: Hit Ctrl+Z anytime. 50 steps of history keep your posing stress-free.
+- Kill Switch: Hit Shift+L to stop the dev server from inside the app.
+- Dynamic Lighting: Click and drag sun and point lights in 3D space. Every light casts soft shadows over the character and the ground.
 - Multiple Cameras: Create multiple camera angles around your character, change FOV for dramatic wide-angle perspectives, and switch angles instantly.
+- Camera Control: Left-drag looks around in first person by default. Settings → Camera Control switches back to classic orbit.
 - High-Resolution Exports: Save individual renders or batch export all compositing passes at 1080p, 2K, or 4K with clean transparent alpha backgrounds.
 
 ---
@@ -65,6 +68,18 @@ npm run dev
 ```
 
 Open the displayed localhost URL in your browser to start posing.
+
+On Windows you can also double-click `launch.vbs` to start the dev server without a console window. Hit Shift+L in the app to stop it again.
+
+### Project Layout
+
+```
+src/engine/    rig, transforms, lighting, camera, render pipeline
+src/components/    React UI: viewport, sidebar cards, modals
+src/utils/    skin loading, settings persistence
+docs/    local design notes and scratch exports (gitignored)
+vendor/    vendored libraries kept out of the bundle
+```
 
 ---
 

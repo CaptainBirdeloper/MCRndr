@@ -2,6 +2,11 @@ import { PosePreset } from '../types';
 
 const DEG = Math.PI / 180;
 
+// Axis conventions for this rig (character faces +Z, limbs hang along local -Y):
+//   X negative -> limb swings FORWARD;  X positive -> limb swings BACKWARD
+//   torso/head X positive -> lean/look forward (down)
+//   Y positive -> yaw toward character's left (+X);  Y negative -> toward right
+//   Z positive -> tip moves toward +X (right arm/leg: INWARD, left arm/leg: OUTWARD)
 export const POSE_PRESETS: PosePreset[] = [
   {
     id: 'walking',
@@ -49,17 +54,122 @@ export const POSE_PRESETS: PosePreset[] = [
     rootPosition: [0, 0, 0],
   },
   {
-    id: 'showcasing',
-    name: 'showcasing',
-    description: 'Joyful celebration with both arms raised high in the air',
+    id: 'idle',
+    name: 'idle',
+    description: 'Relaxed stand with arms resting slightly off the body',
     rotations: {
       head: [0, 0, 0],
-      torso: [0, 0, 0],
-      rightArm: [-168 * DEG, 0, 22 * DEG],
-      leftArm: [-168 * DEG, 0, -22 * DEG],
-      rightLeg: [0, 0, 2 * DEG],
-      leftLeg: [0, 0, -2 * DEG],
+      torso: [1 * DEG, 0, 0],
+      rightArm: [4 * DEG, 0, -4 * DEG],
+      leftArm: [4 * DEG, 0, 4 * DEG],
+      rightLeg: [0, 0, -1 * DEG],
+      leftLeg: [0, 0, 1 * DEG],
       pelvis: [0, 0, 0],
+    },
+    rootPosition: [0, 0, 0],
+  },
+  {
+    id: 'jumping',
+    name: 'jumping',
+    description: 'Star jump with arms and legs spread wide',
+    rotations: {
+      head: [-6 * DEG, 0, 0],
+      torso: [-4 * DEG, 0, 0],
+      rightArm: [-150 * DEG, 0, -30 * DEG],
+      leftArm: [-150 * DEG, 0, 30 * DEG],
+      rightLeg: [0, 0, -16 * DEG],
+      leftLeg: [0, 0, 16 * DEG],
+      pelvis: [0, 0, 0],
+    },
+    rootPosition: [0, 0, 0],
+  },
+  {
+    id: 'waving',
+    name: 'waving',
+    description: 'Right arm raised high in a friendly wave',
+    rotations: {
+      head: [-4 * DEG, -10 * DEG, -6 * DEG],
+      torso: [0, -6 * DEG, 0],
+      rightArm: [-150 * DEG, 0, -18 * DEG],
+      leftArm: [4 * DEG, 0, 3 * DEG],
+      rightLeg: [0, 0, -1 * DEG],
+      leftLeg: [0, 0, 1 * DEG],
+      pelvis: [0, 0, 0],
+    },
+    rootPosition: [0, 0, 0],
+  },
+  {
+    id: 'bowing',
+    name: 'bowing',
+    description: 'Deep formal bow with a straight back',
+    rotations: {
+      head: [10 * DEG, 0, 0],
+      torso: [55 * DEG, 0, 0],
+      rightArm: [12 * DEG, 0, -6 * DEG],
+      leftArm: [12 * DEG, 0, 6 * DEG],
+      rightLeg: [4 * DEG, 0, -1 * DEG],
+      leftLeg: [4 * DEG, 0, 1 * DEG],
+      pelvis: [0, 0, 0],
+    },
+    rootPosition: [0, 0, 0],
+  },
+  {
+    id: 'punching',
+    name: 'punching',
+    description: 'Straight right punch with torso rotation and guard arm',
+    rotations: {
+      head: [0, -8 * DEG, 0],
+      torso: [4 * DEG, 16 * DEG, 0],
+      rightArm: [-92 * DEG, 6 * DEG, 0],
+      leftArm: [-40 * DEG, 0, -18 * DEG],
+      rightLeg: [16 * DEG, 0, -2 * DEG],
+      leftLeg: [-20 * DEG, 0, 2 * DEG],
+      pelvis: [0, 6 * DEG, 0],
+    },
+    rootPosition: [0, 0, 0],
+  },
+  {
+    id: 'kicking',
+    name: 'kicking',
+    description: 'Right front kick with arms out for balance',
+    rotations: {
+      head: [-4 * DEG, 0, 0],
+      torso: [-14 * DEG, 0, 0],
+      rightArm: [-20 * DEG, 0, -38 * DEG],
+      leftArm: [-20 * DEG, 0, 38 * DEG],
+      rightLeg: [-78 * DEG, 0, 2 * DEG],
+      leftLeg: [8 * DEG, 0, 0],
+      pelvis: [0, 0, 0],
+    },
+    rootPosition: [0, 0, 0],
+  },
+  {
+    id: 'falling',
+    name: 'falling',
+    description: 'Backward fall with arched spine and spread limbs',
+    rotations: {
+      head: [-14 * DEG, 0, 0],
+      torso: [-22 * DEG, 0, 0],
+      rightArm: [-95 * DEG, 0, -55 * DEG],
+      leftArm: [-95 * DEG, 0, 55 * DEG],
+      rightLeg: [-18 * DEG, 0, -18 * DEG],
+      leftLeg: [-8 * DEG, 0, 18 * DEG],
+      pelvis: [0, 0, 0],
+    },
+    rootPosition: [0, 0, 0],
+  },
+  {
+    id: 'dancing',
+    name: 'dancing',
+    description: 'Playful dance pose with hip pop and one arm up',
+    rotations: {
+      head: [0, -12 * DEG, 8 * DEG],
+      torso: [0, 20 * DEG, 6 * DEG],
+      rightArm: [-150 * DEG, 10 * DEG, -15 * DEG],
+      leftArm: [-25 * DEG, 0, 35 * DEG],
+      rightLeg: [10 * DEG, 0, -8 * DEG],
+      leftLeg: [-8 * DEG, 0, 8 * DEG],
+      pelvis: [0, 14 * DEG, -5 * DEG],
     },
     rootPosition: [0, 0, 0],
   },

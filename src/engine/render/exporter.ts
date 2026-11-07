@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { SceneStage } from './scene';
 import { ShaderPassMode } from '../../types';
+import type { ExportEnvironment } from './environmentManager';
 
 export type ExportResolution = '1080p' | '2k' | '4k';
 
@@ -31,7 +32,8 @@ export async function capturePassImage(
   pass: ShaderPassMode,
   resolution: ExportResolution = '1080p',
   transparentBg = true,
-  targetCamera?: THREE.PerspectiveCamera | null
+  targetCamera?: THREE.PerspectiveCamera | null,
+  exportEnv?: ExportEnvironment | null
 ): Promise<string> {
   const { renderer, scene, camera, controlsManager } = stage;
   // EDGE CASE: unvalidated resolution key will return undefined from RESOLUTIONS, throwing TypeError on config.width
@@ -61,8 +63,9 @@ export async function capturePassImage(
   }
 
   stage.setShaderPass(pass);
+  const passTransparent = pass === 'beauty' ? transparentBg : true;
   const prevBg = scene.background;
-  scene.background = transparentBg ? null : new THREE.Color(0x000000);
+  scene.background = passTransparent ? null : new THREE.Color(0x000000);
 
   // Always hide studio grid and camera wireframe helpers from exported renders
   const prevGridVisible = stage.grid.visible;
@@ -77,6 +80,11 @@ export async function capturePassImage(
   lightGlyphs.forEach((g) => {
     g.visible = false;
   });
+  // Environment overrides only affect the beauty pass; mask passes must stay clean
+  const restoreEnvironment = stage.environmentManager.prepareForExport(
+    pass === 'beauty' ? exportEnv ?? null : null
+  );
+  stage.environmentManager.update(camera);
 
   // Temporarily configure renderer for unscaled high-res capture (1:1 pixelRatio prevents DPI multiplication)
   renderer.setPixelRatio(1);
@@ -95,6 +103,7 @@ export async function capturePassImage(
   lightGlyphs.forEach((g, i) => {
     g.visible = prevLightVisibility[i];
   });
+  restoreEnvironment();
 
   if (targetCamera) {
     camera.position.copy(prevCamPos);
@@ -127,9 +136,10 @@ export async function exportSinglePass(
   pass: ShaderPassMode,
   resolution: ExportResolution = '1080p',
   transparentBg = true,
-  targetCamera?: THREE.PerspectiveCamera | null
+  targetCamera?: THREE.PerspectiveCamera | null,
+  exportEnv?: ExportEnvironment | null
 ) {
-  const dataUrl = await capturePassImage(stage, pass, resolution, transparentBg, targetCamera);
+  const dataUrl = await capturePassImage(stage, pass, resolution, transparentBg, targetCamera, exportEnv);
   // EDGE CASE: Date.now().slice(-4) repeats every 10 seconds, causing filename collisions during repeated exports
   const time = Date.now().toString().slice(-4);
   downloadDataUrl(dataUrl, `mc_${pass}_${resolution}_${time}.png`);
@@ -150,14 +160,15 @@ export async function exportSelectedPasses(
   passes: ShaderPassMode[],
   resolution: ExportResolution = '1080p',
   transparentBg = true,
-  targetCamera?: THREE.PerspectiveCamera | null
+  targetCamera?: THREE.PerspectiveCamera | null,
+  exportEnv?: ExportEnvironment | null
 ) {
   if (passes.length === 0) return;
   const time = Date.now().toString().slice(-4);
 
   for (const passMode of passes) {
     const filename = PASS_NAMES[passMode] || passMode;
-    const dataUrl = await capturePassImage(stage, passMode, resolution, transparentBg, targetCamera);
+    const dataUrl = await capturePassImage(stage, passMode, resolution, transparentBg, targetCamera, exportEnv);
     downloadDataUrl(dataUrl, `mc_${filename}_${resolution}_${time}.png`);
     // Brief delay to allow browser download queue to process cleanly
     await new Promise((r) => setTimeout(r, 180));
@@ -171,7 +182,8 @@ export async function exportAllPasses(
   stage: SceneStage,
   resolution: ExportResolution = '1080p',
   transparentBg = true,
-  targetCamera?: THREE.PerspectiveCamera | null
+  targetCamera?: THREE.PerspectiveCamera | null,
+  exportEnv?: ExportEnvironment | null
 ) {
-  return exportSelectedPasses(stage, ['beauty', 'wem', 'normal', 'clown'], resolution, transparentBg, targetCamera);
+  return exportSelectedPasses(stage, ['beauty', 'wem', 'normal', 'clown'], resolution, transparentBg, targetCamera, exportEnv);
 }

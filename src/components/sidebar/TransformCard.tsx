@@ -9,10 +9,6 @@ interface TransformCardProps {
   rootRot: [number, number, number];
   partPos: [number, number, number];
   partRot: [number, number, number];
-  onFocus: (kind: 'pos' | 'rot', axis: 'x' | 'y' | 'z', val: number) => void;
-  onBlur: (kind: 'pos' | 'rot', axis: 'x' | 'y' | 'z', val: number) => void;
-  onPosChange: (axis: 'x' | 'y' | 'z', valStr: string) => void;
-  onRotChange: (axis: 'x' | 'y' | 'z', valStr: string) => void;
   activePoseId: string | null;
   onPoseSelect: (id: string) => void;
 }
@@ -24,10 +20,6 @@ export function TransformCard({
   rootRot,
   partPos,
   partRot,
-  onFocus,
-  onBlur,
-  onPosChange,
-  onRotChange,
   activePoseId,
   onPoseSelect,
 }: TransformCardProps) {
@@ -36,11 +28,7 @@ export function TransformCard({
     return name.replace(/([A-Z])/g, ' $1').toUpperCase().trim();
   };
 
-  const renderAxisInputBox = (
-    kind: 'pos' | 'rot',
-    values: [number, number, number],
-    onChange: (axis: 'x' | 'y' | 'z', valStr: string) => void
-  ) => (
+  const renderAxisInputBox = (values: [number, number, number]) => (
     <div className="w-full h-[42px] bg-[#360403] rounded-[15px] flex items-center overflow-hidden border-0 shadow-none">
       {(['x', 'y', 'z'] as const).map((axis, i) => {
         // EDGE CASE: rootPos or partPos array index i missing evaluates to undefined, switching input to uncontrolled
@@ -50,17 +38,13 @@ export function TransformCard({
             <span className="text-[10px] font-bold text-[#F5F5F5]/60 leading-none pt-1">
               {axis.toUpperCase()}
             </span>
-            <input
-              type="number"
-              value={currentVal}
-              onFocus={() => onFocus(kind, axis, currentVal)}
-              onBlur={() => onBlur(kind, axis, currentVal)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') (e.target as HTMLElement).blur();
-              }}
-              onChange={(e) => onChange(axis, e.target.value)}
-              className="w-full text-center text-[18px] font-bold text-[#F5F5F5] bg-transparent border-0 focus:outline-none p-0 leading-tight [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-            />
+            {/* Display only: transforms are driven by the viewport gizmo, never by typed input */}
+            <div
+              aria-readonly="true"
+              className="w-full text-center text-[18px] font-bold text-[#F5F5F5] leading-tight select-none pointer-events-none"
+            >
+              {currentVal}
+            </div>
             {i < 2 && (
               <div className="absolute right-0 top-2 bottom-2 w-[1px] bg-[#07050F]/60 pointer-events-none" />
             )}
@@ -71,7 +55,7 @@ export function TransformCard({
   );
 
   return (
-    <div className="mt-3.5 w-full min-h-[267px] bg-[#730907]/40 rounded-[9px] overflow-hidden flex flex-col border-0 shadow-none">
+    <div className="w-full min-h-[267px] bg-[#730907]/40 rounded-[9px] overflow-hidden flex flex-col border-0 shadow-none">
       <div className="w-full h-[19px] bg-[#730907] flex items-center justify-center px-2">
         <span className="text-[11px] font-bold text-[#AD0D0A] uppercase tracking-wider truncate">
           {activeTab === 'BODY'
@@ -97,7 +81,7 @@ export function TransformCard({
               <Move className="w-2.5 h-2.5 text-[#F5F5F5]/60" />
             </div>
 
-            {renderAxisInputBox('pos', activeTab === 'BODY' ? rootPos : partPos, onPosChange)}
+            {renderAxisInputBox(activeTab === 'BODY' ? rootPos : partPos)}
           </div>
 
           <div className="flex flex-col gap-1">
@@ -106,7 +90,7 @@ export function TransformCard({
               <RotateCw className="w-2.5 h-2.5 text-[#F5F5F5]/60" />
             </div>
 
-            {renderAxisInputBox('rot', activeTab === 'BODY' ? rootRot : partRot, onRotChange)}
+            {renderAxisInputBox(activeTab === 'BODY' ? rootRot : partRot)}
           </div>
 
           <PosePresets activePoseId={activePoseId} onPoseSelect={onPoseSelect} />

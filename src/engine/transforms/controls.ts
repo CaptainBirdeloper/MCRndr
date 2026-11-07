@@ -1,15 +1,22 @@
 import * as THREE from 'three';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { BodyPartName, TransformMode, PosePreset, CameraItem } from '../../types';
+import { BodyPartName, TransformMode, PosePreset, CameraItem, LightSpec } from '../../types';
 import { MinecraftRig } from '../rig/rig';
 import { createCameraManager, ManagedCamera } from '../camera/cameraManager';
 import { LightingManager } from '../lighting/lightingManager';
 import { createHistoryManager, HistoryAction } from './history';
 import { createModalTransformEngine, ModalTransform } from './modalTransform';
 import { PlayerManager } from '../players/playerManager';
+import { createLookControls, LookControls } from '../camera/lookControls';
+import { createLightGlyphDrag, LightGlyphDrag } from '../lighting/lightGlyphDrag';
+import { loadSettings, CameraControlMode } from '../../utils/settings';
 
 export type { ManagedCamera, HistoryAction, ModalTransform };
+
+export type ScenePick =
+  | { kind: 'light'; id: string }
+  | { kind: 'player'; id: string };
 
 export interface RigControlsManager {
   selectedPart: BodyPartName | null;
@@ -25,6 +32,7 @@ export interface RigControlsManager {
   getActiveCameraId: () => string | null;
   getCameraById: (id: string) => THREE.PerspectiveCamera | null;
   getCameraHelpers: () => THREE.Object3D[];
+  exitCameraView: () => void;
   addCamera: () => void;
   cycleCamera: () => void;
   selectCamera: (id: string) => void;
@@ -34,6 +42,12 @@ export interface RigControlsManager {
   getCameraFov: (id: string) => number;
   setPerpetualFov: (fov: number) => void;
   getPerpetualFov: () => number;
+  setCameraControlMode: (mode: CameraControlMode) => void;
+  pickObjectAt: (clientX: number, clientY: number) => ScenePick | null;
+  setLightContextListener: (cb: ((id: string) => void) | null) => void;
+  pickGroundPoint: (clientX: number, clientY: number) => { x: number; z: number } | null;
+  isModalActive: () => boolean;
+  framePlayersIfNeeded: () => void;
   setCameraChangeListener: (cb: (cameras: CameraItem[], activeId: string | null) => void) => void;
   removeCameraChangeListener?: (cb: (cameras: CameraItem[], activeId: string | null) => void) => void;
   wholeBodyMode: boolean;
@@ -52,6 +66,7 @@ export interface RigControlsManager {
   commitRotationHistory: (axis: 'x' | 'y' | 'z', prev: number, next: number) => void;
   commitPartPositionHistory: (part: BodyPartName, axis: 'x' | 'y' | 'z', prev: number, next: number) => void;
   commitPartRotationHistory: (part: BodyPartName, axis: 'x' | 'y' | 'z', prev: number, next: number) => void;
+  commitLightHistory: (prev: LightSpec[], next: LightSpec[], prevExposure: number, nextExposure: number) => void;
   setOnTransformListener: (cb: () => void) => void;
   setOnUndoListener: (cb: () => void) => void;
   captureCurrentPose: (id: string, name: string) => PosePreset;
@@ -86,6 +101,7 @@ export function setupRigControls(
 ): RigControlsManager {
   const raycaster = new THREE.Raycaster();
   const mouse = new THREE.Vector2();
+  const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 
   let selectedPart: BodyPartName | null = null;
   let transformMode: TransformMode = 'translate';
@@ -110,7 +126,108 @@ export function setupRigControls(
   boxHelper.visible = false;
   scene.add(boxHelper);
 
+  let lightDrag: LightGlyphDrag | null = null;
+
+  const lookControls: LookControls = createLookControls({
+    domElement,
+    camera,
+    target: orbitControls.target,
+    // Reuse the persisted sensitivity slider so both camera modes feel alike
+    sensitivity: () => orbitControls.rotateSpeed,
+    isBlocked: () =>
+      gizmo.dragging || modalTransformEngine.isModalActive() || (lightDrag?.isActive() ?? false),
+    // Dragging to look must drop camera view, otherwise the user stays locked to the camera
+    onStart: () => cameraManager.exitCameraView(),
+  });
+
+  function setRayFromScreen(clientX: number, clientY: number) {
+    const rect = domElement.getBoundingClientRect();
+    mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(mouse, camera);
+  }
+
+  // Single depth-sorted pass: separate light/player raycasts let a glyph behind a
+  // player win purely because it was tested first.
+  function raycastScene(
+    clientX: number,
+    clientY: number
+  ): { hit: THREE.Intersection; lightId?: string; playerId?: string } | null {
+    setRayFromScreen(clientX, clientY);
+
+    const hits: THREE.Intersection[] = [];
+    if (lightingManager) {
+      hits.push(...raycaster.intersectObjects(lightingManager.getRaycastTargets(), true));
+    }
+    const meshes: THREE.Object3D[] = [];
+    (playerManager ? playerManager.getAllRigs() : [rig]).forEach((targetRig) => {
+      targetRig.root.traverse((child) => {
+        if ((child as THREE.Mesh).isMesh && child.userData.isBodyPart) meshes.push(child);
+      });
+    });
+    hits.push(...raycaster.intersectObjects(meshes, true));
+    if (hits.length === 0) return null;
+
+    hits.sort((a, b) => a.distance - b.distance);
+    const hit = hits[0];
+    const lightId = hit.object.userData.lightId as string | undefined;
+    if (lightId) return { hit, lightId };
+    let node: THREE.Object3D | null = hit.object;
+    while (node && !node.userData.playerId) node = node.parent;
+    const playerId = node?.userData.playerId as string | undefined;
+    return playerId ? { hit, playerId } : { hit };
+  }
+
+  function pickObjectAt(clientX: number, clientY: number): ScenePick | null {
+    const result = raycastScene(clientX, clientY);
+    if (result?.lightId) return { kind: 'light', id: result.lightId };
+    if (result?.playerId) return { kind: 'player', id: result.playerId };
+    return null;
+  }
+
+  // Where the right-click landed on the stage floor; null when the ray points at the sky
+  function pickGroundPoint(clientX: number, clientY: number): { x: number; z: number } | null {
+    setRayFromScreen(clientX, clientY);
+    const point = new THREE.Vector3();
+    if (!raycaster.ray.intersectPlane(groundPlane, point)) return null;
+    const limit = 4.5;
+    return { x: THREE.MathUtils.clamp(point.x, -limit, limit), z: THREE.MathUtils.clamp(point.z, -limit, limit) };
+  }
+
+  // EDGE CASE: slot positions march right at PLAYER_SPACING, so player 4+ spawns outside
+  // the default 38° frame and "+ Add Player" looks like a no-op. Only reframe when the
+  // newly active rig is actually off-screen, so a user-placed camera is left alone.
+  function framePlayersIfNeeded() {
+    const rigs = playerManager ? playerManager.getAllRigs() : [rig];
+    const active = playerManager ? playerManager.getActiveRig() : rig;
+    camera.updateMatrixWorld();
+    const frustum = new THREE.Frustum().setFromProjectionMatrix(
+      new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)
+    );
+    if (frustum.intersectsBox(new THREE.Box3().setFromObject(active.root))) return;
+
+    const all = new THREE.Box3();
+    rigs.forEach((r) => all.expandByObject(r.root));
+    const center = all.getCenter(new THREE.Vector3());
+    const size = all.getSize(new THREE.Vector3());
+    const radius = Math.max(size.x, size.y) * 0.5 + 0.4;
+    const distance = radius / Math.tan((camera.fov * Math.PI) / 360);
+    orbitControls.target.set(center.x, center.y, center.z);
+    camera.position.set(center.x, Math.max(center.y, 1.4), center.z + Math.max(distance, 3));
+    orbitControls.update();
+  }
+
+  function setCameraControlMode(mode: CameraControlMode) {
+    // EDGE CASE: leaving rotate enabled would let OrbitControls and the look controller write camera.position in the same frame
+    orbitControls.enableRotate = mode === 'orbit';
+    lookControls.setEnabled(mode === 'look');
+  }
+
+  // Apply the persisted mode immediately so a reload does not require opening Settings
+  setCameraControlMode(loadSettings().cameraControlMode);
+
   lightingManager?.setSelectionListener((id) => {
+    lightDrag?.handleSelectionChange(id);
     if (id) {
       selectedPart = null;
       boxHelper.visible = false;
@@ -129,7 +246,6 @@ export function setupRigControls(
   });
 
   const cameraManager = createCameraManager(scene, camera, orbitControls);
-
   let rootTransformCb: ((pos: [number, number, number], rotDeg: [number, number, number]) => void) | null = null;
   let partTransformCb: ((part: BodyPartName, pos: [number, number, number], rotDeg: [number, number, number]) => void) | null = null;
 
@@ -179,6 +295,11 @@ export function setupRigControls(
     notifyRootTransform,
     notifyPartTransform,
     notifyAngleChange,
+    applyLightRig: (specs, exposure) => {
+      if (!lightingManager) return;
+      lightingManager.applyRig(specs);
+      lightingManager.setExposure(exposure);
+    },
   });
 
   const modalTransformEngine = createModalTransformEngine(
@@ -195,6 +316,19 @@ export function setupRigControls(
       notifyAngleChange,
     }
   );
+
+  if (lightingManager) {
+    lightDrag = createLightGlyphDrag({
+      domElement,
+      camera,
+      lightingManager,
+      isBlocked: () => gizmo.dragging || modalTransformEngine.isModalActive(),
+      setNavigationEnabled: (enabled) => {
+        orbitControls.enabled = enabled;
+      },
+      commitHistory: historyManager.commitLightHistory,
+    });
+  }
 
   function getRootTransform() {
     return {
@@ -264,6 +398,7 @@ export function setupRigControls(
   gizmo.addEventListener('dragging-changed', (event) => {
     orbitControls.enabled = !event.value;
     if (event.value) {
+      lightDrag?.cancel();
       if (selectedPart === 'root') {
         gizmoStartPos.copy(rig.root.position);
         gizmoStartQuat.copy(rig.root.quaternion);
@@ -349,8 +484,7 @@ export function setupRigControls(
       modalTransformEngine.finishModal(selectedPart);
     }
     gizmo.detach();
-    rig = nextRig;
-    selectedPart = null;
+    rig = nextRig;    selectedPart = null;
     historyManager.reset();
     boxHelper.setFromObject(rig.root);
     boxHelper.visible = false;
@@ -386,72 +520,61 @@ export function setupRigControls(
   }
 
   let pointerDownPos = { x: 0, y: 0 };
+  let onLightContextCb: ((id: string) => void) | null = null;
 
   function onPointerDown(e: MouseEvent) {
     pointerDownPos = { x: e.clientX, y: e.clientY };
+    if (lightDrag?.begin(e)) {
+      e.stopPropagation();
+      return;
+    }
     if (modalTransformEngine.handlePointerDown(e, selectedPart)) {
       e.stopPropagation();
     }
   }
 
   function onPointerMove(e: MouseEvent) {
+    lightDrag?.move(e);
     modalTransformEngine.handlePointerMove(e, selectedPart);
   }
 
   function onPointerUp(e: MouseEvent) {
+    if (lightDrag?.end(e)) return;
     if (modalTransformEngine.isModalActive()) return;
 
     const dist = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
     if (dist > 5) return;
 
-    const rect = domElement.getBoundingClientRect();
-    mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-    mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    const result = raycastScene(e.clientX, e.clientY);
 
-    raycaster.setFromCamera(mouse, camera);
-
-    if (lightingManager) {
-      const lightTargets = lightingManager.getRaycastTargets();
-      const lightIntersects = raycaster.intersectObjects(lightTargets, true);
-      if (lightIntersects.length > 0) {
-        const hitLightId = lightIntersects[0].object.userData.lightId as string;
-        if (hitLightId) {
-          selectPart(null);
-          lightingManager.selectLight(hitLightId);
-          return;
-        }
+    // Right-click on a light glyph: select it and open the floating modal here, so
+    // the modal never depends on React's contextmenu ordering.
+    if (e.button === 2) {
+      if (result?.lightId) {
+        selectPart(null);
+        lightingManager?.selectLight(result.lightId);
+        onLightContextCb?.(result.lightId);
       }
+      return;
+    }
+    if (e.button !== 0) return;
+
+    if (result?.lightId) {
+      selectPart(null);
+      lightingManager?.selectLight(result.lightId);
+      return;
     }
 
-    const targetRigs = playerManager ? playerManager.getAllRigs() : [rig];
-    const meshes: THREE.Object3D[] = [];
-    targetRigs.forEach((targetRig) => {
-      targetRig.root.traverse((child) => {
-        if ((child as THREE.Mesh).isMesh && child.userData.isBodyPart) {
-          meshes.push(child);
-        }
-      });
-    });
-
-    const intersects = raycaster.intersectObjects(meshes, true);
-    if (intersects.length > 0) {
+    if (result?.playerId) {
       lightingManager?.selectLight(null);
-      const hit = intersects[0];
-
-      if (playerManager) {
-        let node: THREE.Object3D | null = hit.object;
-        while (node && !node.userData.playerId) node = node.parent;
-        const hitPlayerId = node?.userData.playerId as string | undefined;
-        if (hitPlayerId && hitPlayerId !== playerManager.getActiveId()) {
-          playerManager.selectPlayer(hitPlayerId);
-        }
+      if (playerManager && result.playerId !== playerManager.getActiveId()) {
+        playerManager.selectPlayer(result.playerId);
       }
-
       if (wholeBodyMode) {
         selectPart('root');
         return;
       }
-      const partName = hit.object.userData.partName as BodyPartName;
+      const partName = result.hit.object.userData.partName as BodyPartName;
       if (partName) {
         selectPart(partName);
         return;
@@ -464,11 +587,23 @@ export function setupRigControls(
     }
   }
 
+  // G/R press twice in a row to grab the cursor; once to just swap the gizmo
+  const DOUBLE_PRESS_MS = 320;
+  let lastTransformPress: { code: string; time: number } | null = null;
+
+  function isDoublePress(code: string): boolean {
+    const now = performance.now();
+    const doubled = lastTransformPress?.code === code && now - lastTransformPress.time < DOUBLE_PRESS_MS;
+    lastTransformPress = doubled ? null : { code, time: now };
+    return doubled;
+  }
+
   function onKeyDown(e: KeyboardEvent) {
     const isCtrlOrCmd = e.ctrlKey || e.metaKey;
     if (isCtrlOrCmd && e.code === 'KeyZ') {
       e.preventDefault();
       (e.target as HTMLElement)?.blur();
+      lightDrag?.cancel();
       if (e.shiftKey) {
         historyManager.redo();
       } else {
@@ -479,13 +614,14 @@ export function setupRigControls(
     if (isCtrlOrCmd && e.code === 'KeyY') {
       e.preventDefault();
       (e.target as HTMLElement)?.blur();
+      lightDrag?.cancel();
       historyManager.redo();
       return;
     }
 
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 
-    if (!modalTransformEngine.isModalActive() && e.code === 'KeyC' && e.shiftKey) {
+    if (!modalTransformEngine.isModalActive() && e.code === 'KeyV' && !e.ctrlKey && !e.metaKey && !e.altKey) {
       e.preventDefault();
       cameraManager.addCamera();
       return;
@@ -498,38 +634,36 @@ export function setupRigControls(
     if ((e.code === 'KeyR' && e.altKey) || e.code === 'KeyK') {
       e.preventDefault();
       resetSelectedPart();
-    } else if (e.code === 'KeyG') {
+    } else if (e.code === 'KeyG' || e.code === 'KeyR') {
       e.preventDefault();
-      const activeLightId = lightingManager?.getActiveLightId();
-      if (activeLightId) {
-        const lightGroup = lightingManager!.getLightGroupById(activeLightId);
-        if (lightGroup) {
-          setMode('translate');
-          modalTransformEngine.startModalObject('translate', lightGroup);
-          return;
+      const mode: TransformMode = e.code === 'KeyG' ? 'translate' : 'rotate';
+      // A second press of the same key within the window grabs the cursor;
+      // a single press only swaps the gizmo mode
+      const doublePress = !e.repeat && isDoublePress(e.code);
+      setMode(mode);
+
+      if (doublePress) {
+        const activeLightId = lightingManager?.getActiveLightId();
+        if (activeLightId) {
+          const lightGroup = lightingManager!.getLightGroupById(activeLightId);
+          if (lightGroup) {
+            modalTransformEngine.startModalObject(mode, lightGroup);
+            return;
+          }
         }
-      }
-      if (wholeBodyMode && selectedPart !== 'root') {
-        selectPart('root');
-      }
-      setMode('translate');
-      modalTransformEngine.startModal('translate', selectedPart);
-    } else if (e.code === 'KeyR') {
-      e.preventDefault();
-      const activeLightId = lightingManager?.getActiveLightId();
-      if (activeLightId) {
-        const lightGroup = lightingManager!.getLightGroupById(activeLightId);
-        if (lightGroup) {
-          setMode('rotate');
-          modalTransformEngine.startModalObject('rotate', lightGroup);
-          return;
+        if (wholeBodyMode && selectedPart !== 'root') {
+          selectPart('root');
         }
+        modalTransformEngine.startModal(mode, selectedPart);
+        return;
       }
-      if (wholeBodyMode && selectedPart !== 'root') {
-        selectPart('root');
+
+      // Single press: lights have no persistent gizmo drag, so keep the old grab for them
+      if (lightingManager?.getActiveLightId()) {
+        const activeLightId = lightingManager.getActiveLightId();
+        const lightGroup = activeLightId ? lightingManager.getLightGroupById(activeLightId) : null;
+        if (lightGroup) modalTransformEngine.startModalObject(mode, lightGroup);
       }
-      setMode('rotate');
-      modalTransformEngine.startModal('rotate', selectedPart);
     } else if (e.code === 'KeyX' || e.code === 'KeyY' || e.code === 'KeyZ') {
       const axis = e.code === 'KeyX' ? 'x' : e.code === 'KeyY' ? 'y' : 'z';
       if (modalTransformEngine.isModalActive() || selectedPart) {
@@ -539,7 +673,9 @@ export function setupRigControls(
     } else if (e.code === 'KeyQ') {
       toggleSpace();
     } else if (e.code === 'Escape') {
-      if (modalTransformEngine.isModalActive()) {
+      if (lightDrag?.isActive()) {
+        lightDrag.cancel();
+      } else if (modalTransformEngine.isModalActive()) {
         modalTransformEngine.cancelModal(selectedPart);
       } else if (lightingManager?.getActiveLightId()) {
         lightingManager.selectLight(null);
@@ -631,18 +767,33 @@ export function setupRigControls(
     poseAnimId = requestAnimationFrame(step);
   }
 
+  function onPointerCancel() {
+    lightDrag?.cancel();
+  }
+
+  function onWindowBlur() {
+    lightDrag?.cancel();
+  }
+
   domElement.addEventListener('pointerdown', onPointerDown);
   domElement.addEventListener('pointermove', onPointerMove);
   domElement.addEventListener('pointerup', onPointerUp);
+  domElement.addEventListener('pointercancel', onPointerCancel);
+  window.addEventListener('blur', onWindowBlur);
   window.addEventListener('keydown', onKeyDown);
 
   function destroy() {
     if (poseAnimId) cancelAnimationFrame(poseAnimId);
+    lookControls.destroy();
     cameraManager.destroy();
     modalTransformEngine.destroy();
+    lightDrag?.destroy();
+    lightDrag = null;
     domElement.removeEventListener('pointerdown', onPointerDown);
     domElement.removeEventListener('pointermove', onPointerMove);
     domElement.removeEventListener('pointerup', onPointerUp);
+    domElement.removeEventListener('pointercancel', onPointerCancel);
+    window.removeEventListener('blur', onWindowBlur);
     window.removeEventListener('keydown', onKeyDown);
     gizmo.detach();
     gizmo.dispose();
@@ -675,6 +826,7 @@ export function setupRigControls(
     getActiveCameraId: cameraManager.getActiveCameraId,
     getCameraById: cameraManager.getCameraById,
     getCameraHelpers: cameraManager.getCameraHelpers,
+    exitCameraView: cameraManager.exitCameraView,
     addCamera: cameraManager.addCamera,
     cycleCamera: cameraManager.cycleCamera,
     selectCamera: cameraManager.selectCamera,
@@ -684,6 +836,14 @@ export function setupRigControls(
     getCameraFov: cameraManager.getCameraFov,
     setPerpetualFov: cameraManager.setPerpetualFov,
     getPerpetualFov: cameraManager.getPerpetualFov,
+    setCameraControlMode,
+    pickObjectAt,
+    setLightContextListener: (cb) => {
+      onLightContextCb = cb;
+    },
+    pickGroundPoint,
+    isModalActive: () => modalTransformEngine.isModalActive() || (lightDrag?.isActive() ?? false),
+    framePlayersIfNeeded,
     setCameraChangeListener: cameraManager.setCameraChangeListener,
     removeCameraChangeListener: cameraManager.removeCameraChangeListener,
     get wholeBodyMode() {
@@ -717,6 +877,7 @@ export function setupRigControls(
     commitRotationHistory: historyManager.commitRotationHistory,
     commitPartPositionHistory: historyManager.commitPartPositionHistory,
     commitPartRotationHistory: historyManager.commitPartRotationHistory,
+    commitLightHistory: historyManager.commitLightHistory,
     setOnTransformListener: historyManager.setOnTransformListener,
     setOnUndoListener: historyManager.setOnUndoListener,
     captureCurrentPose: (id: string, name: string): PosePreset => {

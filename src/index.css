@@ -66,8 +66,32 @@
   }
 }
 
+/* Global themed scrollbars (thin, inferno thumb on transparent track) */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(174, 13, 10, 0.65) transparent;
+}
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(174, 13, 10, 0.65);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--c-inferno);
+}
+
 .custom-deck-scrollbar::-webkit-scrollbar {
   width: 5px;
+  height: 5px;
 }
 .custom-deck-scrollbar::-webkit-scrollbar-track {
   background: rgba(116, 9, 7, 0.4);

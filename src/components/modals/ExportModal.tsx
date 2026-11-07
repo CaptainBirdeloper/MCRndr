@@ -7,6 +7,9 @@ import {
   ExportResolution,
 } from '../../engine/render/exporter';
 import { ShaderPassMode } from '../../types';
+import { SKYBOX_PRESETS } from '../../engine/render/environmentManager';
+import type { ExportEnvironment } from '../../engine/render/environmentManager';
+import type { GroundMode } from '../../utils/settings';
 import { X, Check, ChevronDown } from 'lucide-react';
 import { SMOOTH, SNAPPY, PRESS_DOWN, PRESS_UP } from '../../utils/motion';
 
@@ -34,10 +37,20 @@ const PASS_CARDS: PassCardConfig[] = [
   { id: 'clown', label: 'clown', image: passClown },
 ];
 
+const GROUND_OPTIONS: { id: GroundMode; label: string }[] = [
+  { id: 'shadow', label: 'shadow' },
+  { id: 'grass', label: 'grass' },
+  { id: 'off', label: 'off' },
+];
+
 export function ExportModal({ stage, activePass, onClose }: ExportModalProps) {
   const [resolution, setResolution] = useState<ExportResolution>('1080p');
   const [selectedPasses, setSelectedPasses] = useState<ShaderPassMode[]>([activePass || 'beauty']);
-  const [isCamOpen, setIsCamOpen] = useState(false);
+  const [exportEnv, setExportEnv] = useState<ExportEnvironment>({
+    skyboxId: 'black',
+    groundMode: 'off',
+  });
+  const [openMenu, setOpenMenu] = useState<'sky' | 'ground' | 'cam' | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [showTick, setShowTick] = useState(false);
 
@@ -46,6 +59,7 @@ export function ExportModal({ stage, activePass, onClose }: ExportModalProps) {
   const [selectedCamId, setSelectedCamId] = useState<string>(initialCamId);
 
   const camContainerRef = useRef<HTMLDivElement>(null);
+  const envContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -59,9 +73,10 @@ export function ExportModal({ stage, activePass, onClose }: ExportModalProps) {
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (camContainerRef.current && !camContainerRef.current.contains(e.target as Node)) {
-        setIsCamOpen(false);
-      }
+      const target = e.target as Node;
+      const inCam = camContainerRef.current?.contains(target);
+      const inEnv = envContainerRef.current?.contains(target);
+      if (!inCam && !inEnv) setOpenMenu(null);
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -86,10 +101,12 @@ export function ExportModal({ stage, activePass, onClose }: ExportModalProps) {
     setIsExporting(true);
     try {
       const targetCam = getTargetCamera();
+      const transparentBg =
+        exportEnv.skyboxId === 'black' && exportEnv.groundMode !== 'grass';
       if (selectedPasses.length === 1) {
-        await exportSinglePass(stage, selectedPasses[0], resolution, true, targetCam);
+        await exportSinglePass(stage, selectedPasses[0], resolution, transparentBg, targetCam, exportEnv);
       } else {
-        await exportSelectedPasses(stage, selectedPasses, resolution, true, targetCam);
+        await exportSelectedPasses(stage, selectedPasses, resolution, transparentBg, targetCam, exportEnv);
       }
       setShowTick(true);
       setTimeout(() => {
@@ -183,7 +200,8 @@ export function ExportModal({ stage, activePass, onClose }: ExportModalProps) {
 
       {/* BOTTOM BAR: 100% FLAT SOLID ELEMENTS */}
       <footer className="w-full flex items-center justify-between">
-        {/* Left: Resolution Pill Segmented Group (Solid Flat) */}
+        {/* Left: Resolution + Export Environment */}
+        <div className="flex items-center gap-4">
         <div className="relative flex items-center bg-[#360403] rounded-full p-1 border-0 shadow-none">
           <motion.div
             className="absolute top-1 bottom-1 left-1 w-[88px] bg-[#730907] rounded-full pointer-events-none"
@@ -223,13 +241,114 @@ export function ExportModal({ stage, activePass, onClose }: ExportModalProps) {
           </button>
         </div>
 
+        {/* Export environment (beauty pass only) */}
+        <div
+          ref={envContainerRef}
+          className={`flex items-center gap-4 transition-opacity ${
+            selectedPasses.includes('beauty') ? '' : 'opacity-40 pointer-events-none'
+          }`}
+        >
+          <div className="flex items-center gap-2.5">
+            <span className="text-[9px] font-extrabold tracking-[0.22em] uppercase text-zinc-500">
+              Sky
+            </span>
+            <div className="relative">
+              <motion.button
+                whileTap={{ scale: 0.96 }}
+                transition={PRESS_DOWN}
+                onClick={() => setOpenMenu((prev) => (prev === 'sky' ? null : 'sky'))}
+                className="flex items-center gap-2.5 px-5 py-2.5 rounded-full bg-[#360403] hover:bg-[#4a0604] text-xs text-white transition-colors cursor-pointer border-0 shadow-none"
+              >
+                <span className="lowercase font-bold">{exportEnv.skyboxId}</span>
+                <ChevronDown className="w-3.5 h-3.5 text-zinc-300 stroke-[2.5]" />
+              </motion.button>
+
+              <AnimatePresence>
+                {openMenu === 'sky' && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                    transition={SNAPPY}
+                    className="absolute left-0 bottom-full mb-2 min-w-[150px] rounded-2xl bg-[#140303] border border-[#360403] p-1.5 shadow-2xl flex flex-col gap-1 z-30"
+                  >
+                    {SKYBOX_PRESETS.map((preset) => (
+                      <button
+                        key={preset.id}
+                        onClick={() => {
+                          setExportEnv((prev) => ({ ...prev, skyboxId: preset.id }));
+                          setOpenMenu(null);
+                        }}
+                        className={`w-full text-left px-3 py-1.5 rounded-xl text-xs font-bold lowercase transition-colors cursor-pointer ${
+                          exportEnv.skyboxId === preset.id
+                            ? 'bg-[#730907] text-white'
+                            : 'hover:bg-[#730907]/40 text-zinc-300'
+                        }`}
+                      >
+                        {preset.label.toLowerCase()}
+                      </button>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2.5">
+            <span className="text-[9px] font-extrabold tracking-[0.22em] uppercase text-zinc-500">
+              Ground
+            </span>
+            <div className="relative">
+              <motion.button
+                whileTap={{ scale: 0.96 }}
+                transition={PRESS_DOWN}
+                onClick={() => setOpenMenu((prev) => (prev === 'ground' ? null : 'ground'))}
+                className="flex items-center gap-2.5 px-5 py-2.5 rounded-full bg-[#360403] hover:bg-[#4a0604] text-xs text-white transition-colors cursor-pointer border-0 shadow-none"
+              >
+                <span className="lowercase font-bold">{exportEnv.groundMode}</span>
+                <ChevronDown className="w-3.5 h-3.5 text-zinc-300 stroke-[2.5]" />
+              </motion.button>
+
+              <AnimatePresence>
+                {openMenu === 'ground' && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                    transition={SNAPPY}
+                    className="absolute left-0 bottom-full mb-2 min-w-[150px] rounded-2xl bg-[#140303] border border-[#360403] p-1.5 shadow-2xl flex flex-col gap-1 z-30"
+                  >
+                    {GROUND_OPTIONS.map((option) => (
+                      <button
+                        key={option.id}
+                        onClick={() => {
+                          setExportEnv((prev) => ({ ...prev, groundMode: option.id }));
+                          setOpenMenu(null);
+                        }}
+                        className={`w-full text-left px-3 py-1.5 rounded-xl text-xs font-bold lowercase transition-colors cursor-pointer ${
+                          exportEnv.groundMode === option.id
+                            ? 'bg-[#730907] text-white'
+                            : 'hover:bg-[#730907]/40 text-zinc-300'
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
+        </div>
+        </div>
+
         {/* Right: Camera Dropdown & Export Button (Solid Flat) */}
         <div className="flex items-center gap-4">
           <div ref={camContainerRef} className="relative">
             <motion.button
               whileTap={{ scale: 0.96 }}
               transition={PRESS_DOWN}
-              onClick={() => setIsCamOpen((prev) => !prev)}
+              onClick={() => setOpenMenu((prev) => (prev === 'cam' ? null : 'cam'))}
               className="flex items-center gap-3 px-6 py-2.5 rounded-full bg-[#360403] hover:bg-[#4a0604] text-xs text-white transition-colors cursor-pointer border-0 shadow-none"
             >
               <span className="lowercase font-bold">{getCamLabel()}</span>
@@ -237,7 +356,7 @@ export function ExportModal({ stage, activePass, onClose }: ExportModalProps) {
             </motion.button>
 
             <AnimatePresence>
-              {isCamOpen && (
+              {openMenu === 'cam' && (
                 <motion.div
                   initial={{ opacity: 0, y: 8, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -248,7 +367,7 @@ export function ExportModal({ stage, activePass, onClose }: ExportModalProps) {
                   <button
                     onClick={() => {
                       setSelectedCamId('viewport');
-                      setIsCamOpen(false);
+                      setOpenMenu(null);
                     }}
                     className={`w-full text-left px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
                       selectedCamId === 'viewport' ? 'bg-[#730907] text-white' : 'hover:bg-[#730907]/40 text-zinc-300'
@@ -264,7 +383,7 @@ export function ExportModal({ stage, activePass, onClose }: ExportModalProps) {
                         key={cam.id}
                         onClick={() => {
                           setSelectedCamId(cam.id);
-                          setIsCamOpen(false);
+                          setOpenMenu(null);
                         }}
                         className={`w-full text-left px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
                           isAct ? 'bg-[#730907] text-white' : 'hover:bg-[#730907]/40 text-zinc-300'

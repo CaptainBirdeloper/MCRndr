@@ -59,12 +59,40 @@ export interface CameraItem {
 
 export type LightType = 'directional' | 'point' | 'spot' | 'ambient';
 
-export interface LightItem {
+export interface LightShadowSpec {
+  enabled: boolean;
+  mapSize: 512 | 1024 | 2048;
+  bias: number;
+  normalBias: number;
+  radius: number;
+  near: number;
+  far: number;
+  extent: number;
+}
+
+/** Serializable description of a light. Source of truth; THREE objects are derived from it. */
+export interface LightSpec {
   id: string;
   name: string;
   type: LightType;
-  visible: boolean;
-  intensity: number;
   color: string;
-  castShadow: boolean;
+  intensity: number;
+  visible: boolean;
+  position: [number, number, number];
+  target: [number, number, number];
+  distance: number;
+  decay: number;
+  angle: number;
+  penumbra: number;
+  shadow: LightShadowSpec;
 }
+
+export interface LightPreset {
+  id: string;
+  label: string;
+  exposure: number;
+  lights: LightSpec[];
+}
+
+/** @deprecated superseded by LightSpec; kept so UI code compiles during the P0 migration */
+export type LightItem = LightSpec;

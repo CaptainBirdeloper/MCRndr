@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { SceneStage } from '../../engine/render/scene';
+import { applySettingsToStage } from '../../engine/render/applyUserSettings';
 import { UserSettings, loadSettings, saveSettings, DEFAULT_SETTINGS } from '../../utils/settings';
-import { Sliders, X, Grid, Camera, RotateCcw, Monitor } from 'lucide-react';
+import { Sliders, X, Grid, Camera, RotateCcw, Monitor, Keyboard } from 'lucide-react';
 import { SNAPPY, PRESS_DOWN } from '../../utils/motion';
 
 interface SettingsModalProps {
@@ -13,24 +14,52 @@ interface SettingsModalProps {
   onSettingsChange?: (settings: UserSettings) => void;
 }
 
+const SHORTCUT_GROUPS: { title: string; items: [string, string[]][] }[] = [
+  {
+    title: 'Viewport',
+    items: [
+      ['Look around', ['LMB Drag']],
+      ['Pan view', ['W', 'A', 'S', 'D']],
+      ['Pan up / down', ['Space', 'Shift']],
+      ['Next camera', ['C']],
+      ['Save view as camera', ['V']],
+    ],
+  },
+  {
+    title: 'Transform',
+    items: [
+      ['Select limb / player', ['LMB']],
+      ['Translate gizmo', ['G']],
+      ['Rotate gizmo', ['R']],
+      ['Grab with cursor', ['G', 'G']],
+      ['Grab with cursor', ['R', 'R']],
+      ['Lock axis', ['X', 'Y', 'Z']],
+      ['Toggle world / local', ['Q']],
+      ['Reset limb rotation', ['K']],
+      ['Confirm grab', ['Enter']],
+      ['Cancel grab / deselect', ['Esc']],
+    ],
+  },
+  {
+    title: 'Workspace',
+    items: [
+      ['Body / Pose / World tab', ['1', '2', '3']],
+      ['Switch player', ['Alt', '1-8']],
+      ['Canvas menu', ['RMB']],
+      ['Toggle HUD', ['H']],
+      ['Undo / Redo', ['Ctrl', 'Z']],
+      ['Kill dev server', ['Shift', 'L']],
+    ],
+  },
+];
+
 export function SettingsModal({ onClose, origin, stage, onSettingsChange }: SettingsModalProps) {
   const [settings, setSettings] = useState<UserSettings>(loadSettings);
-
-  const applySettingsToStage = (newSettings: UserSettings) => {
-    if (!stage) return;
-    stage.controlsManager.setPerpetualFov(newSettings.perpetualFov);
-    stage.controls.rotateSpeed = newSettings.orbitSensitivity;
-    stage.controls.zoomSpeed = newSettings.orbitSensitivity;
-    stage.setPanSpeed(newSettings.panSpeed);
-    stage.grid.visible = newSettings.showGrid;
-    stage.controlsManager.getCameraHelpers().forEach((h) => {
-      h.visible = newSettings.showCameraGlyphs;
-    });
-  };
+  const [tab, setTab] = useState<'general' | 'shortcuts'>('general');
 
   useEffect(() => {
     if (stage) {
-      applySettingsToStage(settings);
+      applySettingsToStage(stage, settings);
     }
   }, [stage]);
 
@@ -48,7 +77,7 @@ export function SettingsModal({ onClose, origin, stage, onSettingsChange }: Sett
     const updated = { ...settings, [key]: value };
     setSettings(updated);
     saveSettings(updated);
-    applySettingsToStage(updated);
+    if (stage) applySettingsToStage(stage, updated);
     onSettingsChange?.(updated);
   };
 
@@ -56,7 +85,7 @@ export function SettingsModal({ onClose, origin, stage, onSettingsChange }: Sett
     const defaults = { ...DEFAULT_SETTINGS };
     setSettings(defaults);
     saveSettings(defaults);
-    applySettingsToStage(defaults);
+    if (stage) applySettingsToStage(stage, defaults);
     onSettingsChange?.(defaults);
   };
 
@@ -141,8 +170,33 @@ export function SettingsModal({ onClose, origin, stage, onSettingsChange }: Sett
           </motion.button>
         </div>
 
-        <div className="p-3.5 flex flex-col gap-3.5 text-[#F5F5F5]">
-          <div className="flex flex-col gap-1.5">
+        <div className="p-3.5 flex flex-col gap-3 text-[#F5F5F5]">
+          <div className="grid grid-cols-2 gap-1.5">
+            {(
+              [
+                ['general', 'General'],
+                ['shortcuts', 'Shortcuts'],
+              ] as const
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setTab(key)}
+                className={`h-[22px] rounded-[15px] text-[9px] font-bold uppercase tracking-wider transition cursor-pointer flex items-center justify-center gap-1 ${
+                  tab === key
+                    ? 'bg-[#730907] text-[#F5F5F5]'
+                    : 'bg-[#360403] text-[#F5F5F5]/60 hover:bg-[#4a0505]'
+                }`}
+              >
+                {key === 'shortcuts' && <Keyboard className="w-2.5 h-2.5" />}
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {tab === 'general' ? (
+            <div className="flex flex-col gap-3.5">
+              <div className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between text-[10px] font-bold text-[#F5F5F5]/80">
               <span className="flex items-center gap-1.5">
                 <Monitor className="w-3.5 h-3.5 text-[#AE0D0A]" />
@@ -182,7 +236,37 @@ export function SettingsModal({ onClose, origin, stage, onSettingsChange }: Sett
 
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between text-[10px] font-bold text-[#F5F5F5]/80">
-              <span>Orbit Sensitivity</span>
+              <span>Camera Control</span>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              {(
+                [
+                  ['look', 'FPS Look'],
+                  ['orbit', 'Classic Orbit'],
+                ] as const
+              ).map(([mode, label]) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => updateSetting('cameraControlMode', mode)}
+                  className={`h-[22px] rounded-[15px] text-[9px] font-bold uppercase tracking-wider transition ${
+                    settings.cameraControlMode === mode
+                      ? 'bg-[#730907] text-[#F5F5F5]'
+                      : 'bg-[#360403] text-[#F5F5F5]/60 hover:bg-[#4a0505]'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <p className="text-[8px] font-bold uppercase tracking-widest text-[#F5F5F5]/30 leading-none select-none">
+              {settings.cameraControlMode === 'look' ? 'LMB drag to look' : 'LMB drag to orbit'}
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center justify-between text-[10px] font-bold text-[#F5F5F5]/80">
+              <span>{settings.cameraControlMode === 'look' ? 'Look Sensitivity' : 'Orbit Sensitivity'}</span>
               <span className="text-[#AE0D0A] font-extrabold">{settings.orbitSensitivity.toFixed(1)}x</span>
             </div>
             <input
@@ -211,7 +295,7 @@ export function SettingsModal({ onClose, origin, stage, onSettingsChange }: Sett
               className="w-full h-1 bg-[#360403] rounded-lg appearance-none cursor-pointer accent-[#AE0D0A]"
             />
             <p className="text-[8px] font-bold uppercase tracking-widest text-[#F5F5F5]/30 leading-none select-none">
-              WASD pan · Shift/Space down/up · RMB menu
+              WASD pan · Space up · Shift down · RMB menu
             </p>
           </div>
 
@@ -230,6 +314,39 @@ export function SettingsModal({ onClose, origin, stage, onSettingsChange }: Sett
               <span>Restore Defaults</span>
             </button>
           </div>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3 max-h-[360px] overflow-y-auto pr-0.5">
+              {SHORTCUT_GROUPS.map((group) => (
+                <div key={group.title} className="flex flex-col gap-1">
+                  <div className="text-[8px] font-bold uppercase tracking-widest text-[#F5F5F5]/30 px-1">
+                    {group.title}
+                  </div>
+                  {group.items.map(([label, keys]) => (
+                    <div
+                      key={`${group.title}-${label}`}
+                      className="flex items-center justify-between gap-2 h-[18px] px-1 rounded-[4px] hover:bg-[#360403]/70"
+                    >
+                      <span className="text-[9.5px] font-bold text-[#F5F5F5]/80 truncate">{label}</span>
+                      <span className="flex items-center gap-1 shrink-0">
+                        {keys.map((k) => (
+                          <span
+                            key={k}
+                            className="h-[16px] min-w-[16px] px-1.5 rounded-[4px] bg-[#360403] border border-white/10 text-[8.5px] font-bold text-[#F5F5F5]/90 flex items-center justify-center leading-none"
+                          >
+                            {k}
+                          </span>
+                        ))}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ))}
+              <p className="text-[8px] font-bold uppercase tracking-widest text-[#F5F5F5]/25 text-center leading-none pt-1">
+                Double-tap G or R to grab with the cursor
+              </p>
+            </div>
+          )}
         </div>
       </motion.div>
     </div>

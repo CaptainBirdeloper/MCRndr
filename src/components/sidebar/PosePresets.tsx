@@ -15,7 +15,7 @@ export function PosePresets({ activePoseId, onPoseSelect }: PosePresetsProps) {
         <Sparkles className="w-2.5 h-2.5 text-[#F5F5F5]/60" />
       </div>
 
-      <div className="grid grid-cols-2 gap-1.5 w-full">
+      <div className="grid grid-cols-2 gap-1.5 w-full max-h-[106px] overflow-y-auto overscroll-contain custom-deck-scrollbar pr-0.5">
         {POSE_PRESETS.map((preset) => {
           const isActive = activePoseId === preset.id;
           return (

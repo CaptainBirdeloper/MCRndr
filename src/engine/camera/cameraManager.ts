@@ -25,6 +25,7 @@ export interface CameraManager {
   getActiveCameraId: () => string | null;
   getCameraById: (id: string) => THREE.PerspectiveCamera | null;
   getCameraHelpers: () => THREE.CameraHelper[];
+  exitCameraView: () => void;
   setCameraChangeListener: (cb: (items: CameraItem[], activeId: string | null) => void) => void;
   removeCameraChangeListener?: (cb: (items: CameraItem[], activeId: string | null) => void) => void;
   destroy: () => void;
@@ -91,7 +92,7 @@ export function createCameraManager(
       visible: true,
     };
     cameras.push(newCam);
-    activeCameraId = id;
+    // Creating a camera must not claim the viewport; only an explicit select/cycle enters it
     notifyCameraChange();
   }
 
@@ -170,13 +171,26 @@ export function createCameraManager(
   function deleteCamera(id: string) {
     const index = cameras.findIndex((c) => c.id === id);
     if (index === -1) return;
+    // A running transition would keep lerping the viewport toward the deleted camera's pose
+    if (cameraAnimId) {
+      cancelAnimationFrame(cameraAnimId);
+      cameraAnimId = 0;
+    }
     const [removed] = cameras.splice(index, 1);
     scene.remove(removed.helper);
     removed.helper.dispose();
 
-    // EDGE CASE: deleting active camera leaves main viewport at deleted camera position without syncing to the fallback camera
+    // Deleting the camera we look through must hand the viewport to a real camera or
+    // free view, otherwise the view stays stranded on the dead pose
     if (activeCameraId === id) {
-      activeCameraId = cameras[Math.max(0, index - 1)]?.id || null;
+      const fallback = cameras[Math.max(0, index - 1)];
+      if (fallback) {
+        transitionToCamera(fallback);
+        return;
+      }
+      activeCameraId = null;
+      camera.fov = perpetualFov;
+      camera.updateProjectionMatrix();
     }
     notifyCameraChange();
   }
@@ -216,19 +230,24 @@ export function createCameraManager(
     return perpetualFov;
   }
 
-  const onOrbitStart = () => {
+  // Leaves camera view without moving the viewport: clears the active id, cancels any
+  // in-flight transition and restores the workspace FOV
+  function exitCameraView() {
     if (cameraAnimId) {
       cancelAnimationFrame(cameraAnimId);
       cameraAnimId = 0;
     }
-    if (activeCameraId !== null) {
-      activeCameraId = null;
-      if (Math.abs(camera.fov - perpetualFov) > 0.01) {
-        camera.fov = perpetualFov;
-        camera.updateProjectionMatrix();
-      }
-      notifyCameraChange();
+    if (activeCameraId === null) return;
+    activeCameraId = null;
+    if (Math.abs(camera.fov - perpetualFov) > 0.01) {
+      camera.fov = perpetualFov;
+      camera.updateProjectionMatrix();
     }
+    notifyCameraChange();
+  }
+
+  const onOrbitStart = () => {
+    exitCameraView();
   };
   orbitControls.addEventListener('start', onOrbitStart);
 
@@ -239,6 +258,9 @@ export function createCameraManager(
       scene.remove(c.helper);
       c.helper.dispose();
     });
+    cameras.length = 0;
+    cameraChangeListeners.length = 0;
+    activeCameraId = null;
   }
 
   return {
@@ -258,6 +280,7 @@ export function createCameraManager(
       return found ? found.camera : null;
     },
     getCameraHelpers: () => cameras.map((c) => c.helper),
+    exitCameraView,
     setCameraChangeListener: (cb: (items: CameraItem[], activeId: string | null) => void) => {
       if (!cameraChangeListeners.includes(cb)) {
         cameraChangeListeners.push(cb);

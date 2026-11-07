@@ -4,7 +4,9 @@ import { SceneStage } from '../../engine/render/scene';
 import { BodyPartName } from '../../types';
 import { TransformCard } from './TransformCard';
 import { CameraCard } from './CameraCard';
+import type { ReactNode } from 'react';
 import { LightingCard } from './LightingCard';
+import { EnvironmentCard } from './EnvironmentCard';
 import { Upload, Image as ImageIcon, Settings } from 'lucide-react';
 import { SMOOTH, SNAPPY, PRESS_DOWN } from '../../utils/motion';
 
@@ -14,6 +16,7 @@ interface LeftSidebarProps {
   activePoseId: string | null;
   selectedPart: BodyPartName | null;
   onPoseSelect: (id: string) => void;
+  guidesCard?: ReactNode;
   onOpenExport: () => void;
   onOpenSettings: (origin: { x: number; y: number }) => void;
   isCollapsed: boolean;
@@ -26,6 +29,7 @@ export function LeftSidebar({
   activePoseId,
   selectedPart,
   onPoseSelect,
+  guidesCard,
   onOpenExport,
   onOpenSettings,
   isCollapsed,
@@ -106,56 +110,6 @@ export function LeftSidebar({
       await stage.loadSkinFile(file);
     }
   };
-
-  // Pre-focus snapshot values for undo tracking
-  const focusValuesRef = useRef<{
-    pos: { x: number; y: number; z: number };
-    rot: { x: number; y: number; z: number };
-  }>({
-    pos: { x: 0, y: 0, z: 0 },
-    rot: { x: 0, y: 0, z: 0 },
-  });
-
-  const handleFocus = (kind: 'pos' | 'rot', axis: 'x' | 'y' | 'z', currentVal: number) => {
-    focusValuesRef.current[kind][axis] = currentVal;
-  };
-
-  const handleBlur = (kind: 'pos' | 'rot', axis: 'x' | 'y' | 'z', currentVal: number) => {
-    const prev = focusValuesRef.current[kind][axis];
-    if (prev === currentVal || !stage) return;
-
-    if (activeTab === 'BODY') {
-      if (kind === 'pos') {
-        stage.controlsManager.commitPositionHistory(axis, prev, currentVal);
-      } else {
-        stage.controlsManager.commitRotationHistory(axis, prev, currentVal);
-      }
-    } else if (selectedPart && selectedPart !== 'root') {
-      if (kind === 'pos') {
-        stage.controlsManager.commitPartPositionHistory(selectedPart, axis, prev, currentVal);
-      } else {
-        stage.controlsManager.commitPartRotationHistory(selectedPart, axis, prev, currentVal);
-      }
-    }
-  };
-
-  const handleTransformAxisChange = (kind: 'pos' | 'rot', axis: 'x' | 'y' | 'z', valStr: string) => {
-    const val = parseFloat(valStr) || 0;
-    if (stage) {
-      if (activeTab === 'BODY') {
-        kind === 'pos'
-          ? stage.controlsManager.setRootPosition(axis, val)
-          : stage.controlsManager.setRootRotation(axis, val);
-      } else if (selectedPart && selectedPart !== 'root') {
-        kind === 'pos'
-          ? stage.controlsManager.setPartPosition(selectedPart, axis, val)
-          : stage.controlsManager.setPartRotation(selectedPart, axis, val);
-      }
-    }
-  };
-
-  const handlePosChange = (axis: 'x' | 'y' | 'z', valStr: string) => handleTransformAxisChange('pos', axis, valStr);
-  const handleRotChange = (axis: 'x' | 'y' | 'z', valStr: string) => handleTransformAxisChange('rot', axis, valStr);
 
   // Scroll affordance: the top fade only shows when there is content hidden above
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -248,10 +202,12 @@ export function LeftSidebar({
             onScroll={updateFades}
             className="w-full h-full overflow-y-auto overflow-x-hidden overscroll-contain custom-deck-scrollbar px-2.5"
           >
-            <div ref={contentRef} className="flex flex-col gap-2">
+            <div ref={contentRef} className="flex flex-col gap-2 pt-3.5 pb-2.5">
               {activeTab === 'WORLD' ? (
                 <>
+                  <EnvironmentCard stage={stage} />
                   <CameraCard stage={stage} />
+                  {guidesCard}
                   <LightingCard stage={stage} />
                 </>
               ) : (
@@ -262,10 +218,6 @@ export function LeftSidebar({
                   rootRot={rootRot}
                   partPos={partPos}
                   partRot={partRot}
-                  onFocus={handleFocus}
-                  onBlur={handleBlur}
-                  onPosChange={handlePosChange}
-                  onRotChange={handleRotChange}
                   activePoseId={activePoseId}
                   onPoseSelect={onPoseSelect}
                 />

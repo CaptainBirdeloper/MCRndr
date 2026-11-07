@@ -5,6 +5,7 @@ import { MinecraftRig } from '../rig/rig';
 import { setupRigControls, RigControlsManager } from '../transforms/controls';
 import { ShaderPassManager } from './shaders';
 import { createLightingManager, LightingManager } from '../lighting/lightingManager';
+import { createEnvironmentManager, EnvironmentManager } from './environmentManager';
 import { createPlayerManager, PlayerManager } from '../players/playerManager';
 import { BodyPartName, ShaderPassMode, ArmType } from '../../types';
 import { loadSettings } from '../../utils/settings';
@@ -19,18 +20,13 @@ export interface SceneStage {
   shaderManager: ShaderPassManager;
   players: PlayerManager;
   lightingManager: LightingManager;
-  lights: {
-    key: THREE.DirectionalLight;
-    fill: THREE.DirectionalLight;
-    rim: THREE.DirectionalLight;
-    ambient: THREE.AmbientLight;
-  };
+  environmentManager: EnvironmentManager;
   ground: THREE.Mesh;
   grid: THREE.GridHelper;
   isExporting: boolean;
   setShaderPass: (mode: ShaderPassMode) => void;
   setPanSpeed: (speed: number) => void;
-  loadSkinFile: (file: File) => Promise<ArmType>;
+  loadSkinFile: (file: File, playerId?: string) => Promise<ArmType>;
   resize: () => void;
   destroy: () => void;
 }
@@ -74,21 +70,42 @@ export function createScene(
   (controls.mouseButtons as unknown as { RIGHT: unknown }).RIGHT = null;
   controls.update();
 
-  const lightingManager = createLightingManager(scene);
-  // EDGE CASE: fallback DirectionalLight is never added to scene, silently disconnecting light controls from rendering
-  const keyLight = (lightingManager.getLightGroupById('light_key_light')?.children[0] as THREE.DirectionalLight) || new THREE.DirectionalLight();
-  const fillLight = (lightingManager.getLightGroupById('light_fill_light')?.children[0] as THREE.DirectionalLight) || new THREE.DirectionalLight();
-  const rimLight = (lightingManager.getLightGroupById('light_rim_light')?.children[0] as THREE.DirectionalLight) || new THREE.DirectionalLight();
-  const ambient = new THREE.AmbientLight(0xffffff, 0.45);
+  const storedSettings = loadSettings();
+  const lightingManager = createLightingManager(scene, {
+    initialRig: storedSettings.lightRig,
+    presetId: storedSettings.lightingPresetId,
+    exposure: storedSettings.exposure,
+    onExposure: (value) => {
+      renderer.toneMappingExposure = value;
+    },
+    onShadowMode: (mode) => {
+      const type = mode === 'basic' ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
+      if (renderer.shadowMap.type === type) return;
+      renderer.shadowMap.type = type;
+      renderer.shadowMap.needsUpdate = true;
+      scene.traverse((obj) => {
+        const mesh = obj as THREE.Mesh;
+        const material = mesh.material as THREE.Material | THREE.Material[] | undefined;
+        if (Array.isArray(material)) material.forEach((m) => (m.needsUpdate = true));
+        else if (material) material.needsUpdate = true;
+      });
+    },
+  });
+  renderer.toneMappingExposure = lightingManager.getExposure();
 
-  // Shadow Catcher Ground (captures shadow on transparent alpha)
-  const shadowGeo = new THREE.PlaneGeometry(20, 20);
-  const shadowMat = new THREE.ShadowMaterial({ opacity: 0.35 });
-  const ground = new THREE.Mesh(shadowGeo, shadowMat);
-  ground.rotation.x = -Math.PI / 2;
-  ground.receiveShadow = true;
-  ground.position.y = 0;
-  scene.add(ground);
+  // Sky dome, flat grass world, fog and image-based GI
+  const environmentManager = createEnvironmentManager({
+    renderer,
+    scene,
+    initial: {
+      skyboxId: storedSettings.skyboxId,
+      groundMode: storedSettings.groundMode,
+      fogEnabled: storedSettings.fogEnabled,
+      fogFar: storedSettings.fogFar,
+      giEnabled: storedSettings.giEnabled,
+      giIntensity: storedSettings.giIntensity,
+    },
+  });
 
   const grid = new THREE.GridHelper(10, 20, 0x730907, 0x1f0b18);
   grid.position.y = 0.001;
@@ -115,11 +132,11 @@ export function createScene(
   function setShaderPass(mode: ShaderPassMode) {
     playerManager.setShaderPass(mode);
     const isBeauty = mode === 'beauty';
-    ground.visible = isBeauty;
+    environmentManager.setPassVisible(mode);
     grid.visible = isBeauty;
   }
 
-  async function loadSkinFile(file: File): Promise<ArmType> {
+  async function loadSkinFile(file: File, playerId?: string): Promise<ArmType> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = (e) => {
@@ -129,7 +146,7 @@ export function createScene(
           const tex = createSkinTexture(img);
           const detectedArm = detectSkinModel(img);
           playerManager.applySkin(
-            playerManager.getActiveId(),
+            playerId ?? playerManager.getActiveId(),
             tex,
             detectedArm,
             file.name.replace(/\.png$/i, '')
@@ -193,6 +210,10 @@ export function createScene(
       (pressedKeys.has('ShiftLeft') || pressedKeys.has('ShiftRight') ? 1 : 0);
     if (forwardAmount === 0 && strafeAmount === 0 && verticalAmount === 0) return;
 
+    // Panning the workspace viewport must leave camera view; otherwise WASD moves the
+    // camera we look through and the view stays trapped on it
+    if (controlsManager.getActiveCameraId()) controlsManager.exitCameraView();
+
     panDelta.set(0, 0, 0);
 
     if (forwardAmount !== 0 || strafeAmount !== 0) {
@@ -233,7 +254,8 @@ export function createScene(
     if (isExporting) return;
     applyWASDPan(dt);
     controls.update();
-    lightingManager.updateGlyphScale(camera);
+    environmentManager.update(camera);
+    lightingManager.updateGlyphVisuals(camera);
     renderer.render(scene, camera);
   }
   animate();
@@ -259,6 +281,7 @@ export function createScene(
     controlsManager.destroy();
     playerManager.destroy();
     lightingManager.destroy();
+    environmentManager.destroy();
     controls.dispose();
     renderer.forceContextLoss();
     renderer.dispose();
@@ -271,7 +294,8 @@ export function createScene(
   const hideFlags = (new URLSearchParams(window.location.search).get('hide') || '').split(',').filter(Boolean);
   if (hideFlags.length > 0) {
     if (hideFlags.includes('grid')) grid.visible = false;
-    if (hideFlags.includes('ground')) ground.visible = false;
+    if (hideFlags.includes('ground')) environmentManager.ground.visible = false;
+    if (hideFlags.includes('sky')) environmentManager.sky.visible = false;
     if (hideFlags.includes('rig')) playerManager.getActiveRig().root.visible = false;
     if (hideFlags.includes('shadow')) {
       renderer.shadowMap.enabled = false;
@@ -313,8 +337,8 @@ export function createScene(
     },
     players: playerManager,
     lightingManager,
-    lights: { key: keyLight, fill: fillLight, rim: rimLight, ambient },
-    ground,
+    environmentManager,
+    ground: environmentManager.ground,
     grid,
     get isExporting() {
       return isExporting;

@@ -24,7 +24,7 @@ export interface PlayerManager {
   getActiveId: () => string;
   getActiveRig: () => MinecraftRig;
   getActiveShader: () => ShaderPassManager;
-  createPlayer: () => string;
+  createPlayer: (spawn?: { x: number; z: number }) => string;
   deletePlayer: (id: string) => void;
   renamePlayer: (id: string, name: string) => boolean;
   selectPlayer: (id: string) => void;
@@ -79,14 +79,29 @@ export function createPlayerManager(
     record.texture.dispose();
   }
 
-  function createPlayer(): string {
+  // EDGE CASE: a right-click that lands on an existing player must not stack the new
+  // rig inside them, so walk along x until the spot is clear of every player
+  function resolveSpawn(spawn: { x: number; z: number }): { x: number; z: number } | null {
+    const minDistance = PLAYER_SPACING * 0.9;
+    for (let step = 0; step < MAX_PLAYERS; step++) {
+      const x = spawn.x + step * PLAYER_SPACING;
+      const clear = records.every(
+        (r) => Math.hypot(r.rig.root.position.x - x, r.rig.root.position.z - spawn.z) >= minDistance
+      );
+      if (clear) return { x, z: spawn.z };
+    }
+    return null;
+  }
+
+  function createPlayer(spawn?: { x: number; z: number }): string {
     if (records.length >= MAX_PLAYERS) return activeId;
 
     const slot = nextSlot();
     const id = `player_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
     const texture = createDefaultTexture();
     const rig = createMinecraftRig(texture, 'steve');
-    rig.root.position.set(slot * PLAYER_SPACING, 0, 0);
+    const point = spawn ? resolveSpawn(spawn) : null;
+    rig.root.position.set(point ? point.x : slot * PLAYER_SPACING, 0, point ? point.z : 0);
     rig.root.userData.playerId = id;
     scene.add(rig.root);
 

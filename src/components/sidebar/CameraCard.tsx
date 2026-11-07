@@ -47,9 +47,6 @@ export function CameraCard({ stage }: CameraCardProps) {
   const handleFovChange = (val: number) => {
     if (!activeCam) return;
     stage.controlsManager.setCameraFov(activeCam.id, val);
-    if (activeCameraId !== activeCam.id) {
-      stage.controlsManager.selectCamera(activeCam.id);
-    }
   };
 
   const handleSnapToCamera = () => {
@@ -76,7 +73,7 @@ export function CameraCard({ stage }: CameraCardProps) {
   ];
 
   return (
-    <div className="mt-3.5 w-full min-h-[267px] bg-[#730907]/40 rounded-[9px] overflow-hidden flex flex-col border-0 shadow-none font-['Rethink_Sans']">
+    <div className="w-full min-h-[267px] bg-[#730907]/40 rounded-[9px] overflow-hidden flex flex-col border-0 shadow-none font-['Rethink_Sans']">
       <div className="w-full h-[19px] bg-[#730907] flex items-center justify-center px-2">
         <span className="text-[11px] font-bold text-[#AD0D0A] uppercase tracking-wider truncate">
           CAMERA
@@ -141,9 +138,14 @@ export function CameraCard({ stage }: CameraCardProps) {
             </div>
             <div className="flex items-center gap-1.5">
               {isViewingCamera ? (
-                <span className="text-[8px] font-bold uppercase tracking-wider text-[#BAF5F5] bg-[#07050F] px-1.5 py-0.5 rounded leading-none">
-                  In View
-                </span>
+                <button
+                  type="button"
+                  onClick={() => stage.controlsManager.exitCameraView()}
+                  title="Leave camera view"
+                  className="text-[8px] font-bold uppercase tracking-wider text-[#BAF5F5] bg-[#07050F] hover:bg-[#AE0D0A] hover:text-white px-1.5 py-0.5 rounded cursor-pointer transition active:scale-95 border-0 shadow-none leading-none"
+                >
+                  Exit View
+                </button>
               ) : (
                 <button
                   type="button"
