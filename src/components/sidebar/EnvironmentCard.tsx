@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
+import { motion } from 'motion/react';
 import { SceneStage } from '../../engine/render/scene';
 import { EnvironmentState, SKYBOX_PRESETS } from '../../engine/render/environmentManager';
 import { GroundMode } from '../../utils/settings';
+import { SNAPPY } from '../../utils/motion';
+import { useSlidingPill } from '../../utils/useSlidingPill';
 
 const GROUND_OPTIONS: Array<{ id: GroundMode; label: string }> = [
   { id: 'shadow', label: 'SHADOW' },
@@ -55,13 +58,15 @@ function Slider({
       value={value}
       onChange={(e) => onInput(Number(e.target.value))}
       onPointerUp={onCommit}
-      className="w-full h-1 accent-[#AE0D0A] cursor-pointer"
+      className="w-full accent-[#AE0D0A] cursor-pointer h-1.5 bg-[#07050F] rounded-lg appearance-none"
     />
   );
 }
 
 export function EnvironmentCard({ stage }: EnvironmentCardProps) {
   const [state, setState] = useState<EnvironmentState | null>(null);
+  const skyPill = useSlidingPill(state?.skyboxId ?? null);
+  const groundPill = useSlidingPill(state?.groundMode ?? null);
 
   useEffect(() => {
     if (!stage?.environmentManager) return;
@@ -84,15 +89,29 @@ export function EnvironmentCard({ stage }: EnvironmentCardProps) {
       <div className="p-2 flex flex-col gap-2">
         <div className="flex flex-col gap-1">
           <span className="text-[8.5px] font-bold text-[#F5F5F5]/60">SKYBOX</span>
-          <div className="flex items-center gap-1">
+          <div ref={skyPill.containerRef} className="relative grid grid-cols-2 gap-1">
+            {skyPill.pill && (
+              <motion.span
+                initial={false}
+                animate={{
+                  x: skyPill.pill.x,
+                  y: skyPill.pill.y,
+                  width: skyPill.pill.width,
+                  height: skyPill.pill.height,
+                }}
+                transition={SNAPPY}
+                className="absolute left-0 top-0 rounded-[5px] bg-[#AE0D0A] pointer-events-none"
+              />
+            )}
             {SKYBOX_PRESETS.map((preset) => (
               <button
                 key={preset.id}
+                ref={skyPill.register(preset.id)}
                 type="button"
                 onClick={() => em.setSkybox(preset.id)}
-                className={`flex-1 h-[16px] rounded-[4px] text-[8px] font-bold uppercase tracking-wider cursor-pointer transition ${
+                className={`relative z-10 h-[19px] rounded-[5px] text-[8px] font-bold uppercase tracking-wider cursor-pointer transition-colors ${
                   state.skyboxId === preset.id
-                    ? 'bg-[#AE0D0A] text-white'
+                    ? 'text-white'
                     : 'bg-[#07050F]/60 text-[#F5F5F5]/60 hover:text-white'
                 }`}
               >
@@ -104,15 +123,29 @@ export function EnvironmentCard({ stage }: EnvironmentCardProps) {
 
         <div className="flex flex-col gap-1">
           <span className="text-[8.5px] font-bold text-[#F5F5F5]/60">GROUND</span>
-          <div className="flex items-center gap-1">
+          <div ref={groundPill.containerRef} className="relative flex items-center gap-1">
+            {groundPill.pill && (
+              <motion.span
+                initial={false}
+                animate={{
+                  x: groundPill.pill.x,
+                  y: groundPill.pill.y,
+                  width: groundPill.pill.width,
+                  height: groundPill.pill.height,
+                }}
+                transition={SNAPPY}
+                className="absolute left-0 top-0 rounded-[5px] bg-[#AE0D0A] pointer-events-none"
+              />
+            )}
             {GROUND_OPTIONS.map((option) => (
               <button
                 key={option.id}
+                ref={groundPill.register(option.id)}
                 type="button"
                 onClick={() => em.setGroundMode(option.id)}
-                className={`flex-1 h-[16px] rounded-[4px] text-[8px] font-bold uppercase tracking-wider cursor-pointer transition ${
+                className={`relative z-10 flex-1 h-[19px] rounded-[5px] text-[8px] font-bold uppercase tracking-wider cursor-pointer transition-colors ${
                   state.groundMode === option.id
-                    ? 'bg-[#AE0D0A] text-white'
+                    ? 'text-white'
                     : 'bg-[#07050F]/60 text-[#F5F5F5]/60 hover:text-white'
                 }`}
               >
@@ -137,7 +170,7 @@ export function EnvironmentCard({ stage }: EnvironmentCardProps) {
                 onInput={(value) => em.setFogFar(value)}
                 onCommit={() => undefined}
               />
-              <span className="w-6 text-right text-[8px] font-bold text-[#F5F5F5]/60">{Math.round(state.fogFar)}</span>
+              <span className="w-7 text-right text-[8.5px] font-bold text-[#AE0D0A]">{Math.round(state.fogFar)}</span>
             </div>
           )}
         </div>
@@ -157,7 +190,7 @@ export function EnvironmentCard({ stage }: EnvironmentCardProps) {
                 onInput={(value) => em.setGiIntensity(value)}
                 onCommit={() => undefined}
               />
-              <span className="w-6 text-right text-[8px] font-bold text-[#F5F5F5]/60">{state.giIntensity.toFixed(2)}</span>
+              <span className="w-7 text-right text-[8.5px] font-bold text-[#AE0D0A]">{state.giIntensity.toFixed(2)}</span>
             </div>
           )}
         </div>

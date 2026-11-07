@@ -1,7 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
+import { motion } from 'motion/react';
 import { SceneStage } from '../../engine/render/scene';
 import { LightSpec, LightType } from '../../types';
 import { Eye, EyeOff, Plus, Trash2, Copy } from 'lucide-react';
+import { SNAPPY } from '../../utils/motion';
+import { useSlidingPill } from '../../utils/useSlidingPill';
 
 const PRESET_SWATCHES = ['#FFF3E0', '#CFD8DC', '#80D8FF', '#FFA726'];
 const MAP_SIZES: Array<512 | 1024 | 2048> = [512, 1024, 2048];
@@ -20,6 +23,7 @@ export function LightingCard({ stage }: LightingCardProps) {
   const [lights, setLights] = useState<LightSpec[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [presetId, setPresetId] = useState<string | null>(null);
+  const presetPill = useSlidingPill(presetId);
   const [addOpen, setAddOpen] = useState(false);
   const dragRef = useRef<{ specs: LightSpec[]; exposure: number } | null>(null);
 
@@ -108,15 +112,32 @@ export function LightingCard({ stage }: LightingCardProps) {
           </div>
         </div>
 
-        <div className="flex items-center gap-1 overflow-x-auto custom-deck-scrollbar pb-0.5">
+        <div
+          ref={presetPill.containerRef}
+          className="relative flex items-center gap-1 overflow-x-auto custom-deck-scrollbar pb-0.5"
+        >
+          {presetPill.pill && (
+            <motion.span
+              initial={false}
+              animate={{
+                x: presetPill.pill.x,
+                y: presetPill.pill.y,
+                width: presetPill.pill.width,
+                height: presetPill.pill.height,
+              }}
+              transition={SNAPPY}
+              className="absolute left-0 top-0 rounded-[4px] bg-[#AE0D0A] pointer-events-none"
+            />
+          )}
           {presets.map((p) => (
             <button
               key={p.id}
+              ref={presetPill.register(p.id)}
               type="button"
               onClick={() => mutate(() => lm?.applyPreset(p.id))}
-              className={`h-[16px] px-1.5 rounded-[4px] text-[8px] font-bold uppercase tracking-wider shrink-0 cursor-pointer transition ${
+              className={`relative z-10 h-[16px] px-1.5 rounded-[4px] text-[8px] font-bold uppercase tracking-wider shrink-0 cursor-pointer transition-colors ${
                 presetId === p.id
-                  ? 'bg-[#AE0D0A] text-white'
+                  ? 'text-white'
                   : 'bg-[#07050F]/60 text-[#F5F5F5]/60 hover:text-white'
               }`}
             >

@@ -483,7 +483,13 @@ export function createLightingManager(
     ambientObject.dispose();
   }
 
-  applyRig(options.initialRig ?? null);
+  if (options.initialRig) {
+    applyRig(options.initialRig);
+  } else if (presetId) {
+    applyPreset(presetId);
+  } else {
+    applyRig(null);
+  }
   applyExposure(options.exposure ?? DEFAULT_EXPOSURE);
 
   return {

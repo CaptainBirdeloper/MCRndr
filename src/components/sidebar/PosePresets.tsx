@@ -1,6 +1,9 @@
+import { motion } from 'motion/react';
 import { POSE_PRESETS } from '../../presets/poses';
 import { AutoFitText } from '../common/AutoFitText';
 import { Sparkles, Plus } from 'lucide-react';
+import { SNAPPY } from '../../utils/motion';
+import { useSlidingPill } from '../../utils/useSlidingPill';
 
 interface PosePresetsProps {
   activePoseId: string | null;
@@ -8,6 +11,8 @@ interface PosePresetsProps {
 }
 
 export function PosePresets({ activePoseId, onPoseSelect }: PosePresetsProps) {
+  const posePill = useSlidingPill(activePoseId);
+
   return (
     <div className="flex flex-col gap-1.5 pt-0.5">
       <div className="flex items-center gap-1 text-[#F5F5F5]/60 text-[9px] font-bold tracking-wider">
@@ -15,17 +20,34 @@ export function PosePresets({ activePoseId, onPoseSelect }: PosePresetsProps) {
         <Sparkles className="w-2.5 h-2.5 text-[#F5F5F5]/60" />
       </div>
 
-      <div className="grid grid-cols-2 gap-1.5 w-full max-h-[106px] overflow-y-auto overscroll-contain custom-deck-scrollbar pr-0.5">
+      <div
+        ref={posePill.containerRef}
+        className="relative grid grid-cols-2 gap-1.5 w-full max-h-[106px] overflow-y-auto overscroll-contain custom-deck-scrollbar pr-0.5"
+      >
+        {posePill.pill && (
+          <motion.span
+            initial={false}
+            animate={{
+              x: posePill.pill.x,
+              y: posePill.pill.y,
+              width: posePill.pill.width,
+              height: posePill.pill.height,
+            }}
+            transition={SNAPPY}
+            className="absolute left-0 top-0 rounded-[15px] bg-[#AE0D0A] pointer-events-none"
+          />
+        )}
         {POSE_PRESETS.map((preset) => {
           const isActive = activePoseId === preset.id;
           return (
             <button
               key={preset.id}
+              ref={posePill.register(preset.id)}
               type="button"
               onClick={() => onPoseSelect(preset.id)}
-              className={`h-[22px] rounded-[15px] text-[8.5px] font-bold uppercase tracking-wider transition active:scale-95 cursor-pointer px-1.5 flex items-center justify-center border-0 shadow-none overflow-hidden ${
+              className={`relative z-10 h-[22px] rounded-[15px] text-[8.5px] font-bold uppercase tracking-wider transition-colors active:scale-95 cursor-pointer px-1.5 flex items-center justify-center border-0 shadow-none overflow-hidden ${
                 isActive
-                  ? 'bg-[#AE0D0A] text-[#F5F5F5]'
+                  ? 'text-[#F5F5F5]'
                   : 'bg-[#07050F] text-[#F5F5F5] hover:bg-[#730907]/40'
               }`}
             >
